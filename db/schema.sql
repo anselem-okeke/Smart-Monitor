@@ -1,0 +1,51 @@
+---- schema.sql
+
+-- Table for system resource monitoring (CPU, memory, disk, etc.)
+CREATE TABLE IF NOT EXISTS system_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hostname TEXT NOT NULL,
+    cpu_usage REAL,
+    memory_usage REAL,
+    disk_usage REAL,
+    temperature REAL,
+    uptime INTEGER,               -- in seconds
+    process_count INTEGER,
+    load_average REAL
+);
+
+-- Table for network connectivity logs
+CREATE TABLE IF NOT EXISTS network_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hostname TEXT NOT NULL,       -- machine performing the test
+    target TEXT NOT NULL,         -- IP or domain being tested
+    method TEXT NOT NULL,         -- ping, nslookup, traceroute
+    result TEXT,                  -- raw output or summary
+    latency_ms REAL,              -- optional for ping
+    packet_loss_percent REAL,     -- optional for ping/traceroute
+    status TEXT                   -- success, fail, unreachable
+);
+
+-- Table for service status monitoring
+CREATE TABLE IF NOT EXISTS service_status (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    host TEXT NOT NULL,
+    service_name TEXT NOT NULL,
+    status TEXT NOT NULL,         -- running, stopped, paused, etc.
+    start_time DATETIME,          -- when the service started
+    exit_code INTEGER,            -- optional: for debugging
+    error_message TEXT            -- if crashed or failed to start
+);
+
+-- Table to log system alerts and anomalies
+CREATE TABLE IF NOT EXISTS alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hostname TEXT,
+    severity TEXT NOT NULL,       -- info, warning, critical
+    source TEXT NOT NULL,         -- CPU, Memory, Service, Network, etc.
+    message TEXT                  -- human-readable alert
+);
+
