@@ -1,3 +1,7 @@
+#------------------------------------------
+"""Author: Anselem Okeke"""
+#------------------------------------------
+
 import platform
 import socket
 import time
@@ -26,7 +30,6 @@ def collect_system_metrics():
         "process_count": process_count,
         "load_average": load_avg
     }
-
 
 def monitored_services():
     monitored = set()

@@ -1,3 +1,7 @@
+#------------------------------------------
+"""Author: Anselem Okeke"""
+#------------------------------------------
+
 import sqlite3
 
 conn = sqlite3.connect("db/smart_factory_monitor.db")

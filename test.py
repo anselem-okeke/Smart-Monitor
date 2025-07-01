@@ -109,12 +109,60 @@ import subprocess
 #         # print(service_name)
 # print(output.splitlines())
 
-import psutil
-import platform
+# import psutil
+# import platform
+#
+# def get_load_indicator():
+#     if platform.system() == "Windows":
+#         return psutil.cpu_percent(interval=1)  # Alternative metric
+#     else:
+#         return psutil.getloadavg()[0]  # 1-minute load avg on Linux
+# print(get_load_indicator())
 
-def get_load_indicator():
-    if platform.system() == "Windows":
-        return psutil.cpu_percent(interval=1)  # Alternative metric
-    else:
-        return psutil.getloadavg()[0]  # 1-minute load avg on Linux
-print(get_load_indicator())
+result = subprocess.run(
+    ["ping", "-n", "4", "192.168.56.11"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+    timeout=10
+)
+# new_val = []
+# x = result.stdout.splitlines()
+# for line in x:
+#     if "Average =" in line:
+#         parts = line.split(",")
+#         for part in parts:
+#             part = part.strip()
+#             print(part)
+#             if part.startswith("Average"):
+#                 value = float(part.split("=")[-1].strip().replace("ms", ""))
+#                 print(value)
+#         parts = line.strip().split(" ")
+#         print(parts)
+#         for part in parts:
+#             if "Average" in part:
+#                 continue
+#             if "ms" in part:
+#                 ms_val = float(part.replace("ms", "").replace(",", ""))
+#                 new_val.append(ms_val)
+#
+# print(new_val[2])
+
+system = platform.system().lower()
+print(system)
+traceroute_cmd = "tracert" if system == "windows" else "traceroute"
+
+result = subprocess.run(
+    [traceroute_cmd, "192.168.56.11"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+    timeout=30
+)
+
+
+import sqlite3
+conn = sqlite3.connect("db/smart_factory_monitor.db")
+cursor = conn.cursor()
+cursor.execute("SELECT DISTINCT hostname FROM system_metrics")
+print(cursor.fetchall())

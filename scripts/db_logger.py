@@ -1,10 +1,13 @@
+#------------------------------------------
+"""Author: Anselem Okeke"""
+#------------------------------------------
+
 import sqlite3
 import os
 import json
 
-# Load DB path from config
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../config/db_config.json")
-with open(CONFIG_PATH, 'r') as f:
+CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
+with open(CONFIG_PATH, "r") as f:
     config = json.load(f)
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../" + config["path"]))
@@ -18,6 +21,8 @@ def log_system_metrics(metrics):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+
+        print("[DEBUG] Attempting to insert system metrics for host:", metrics.get("hostname"))
 
         cursor.execute("""
             INSERT INTO system_metrics (
@@ -80,6 +85,11 @@ def log_service_status(service):
 def log_network_event(event):
     conn = None
     try:
+        required_keys = ["hostname", "target", "method", "result", "latency_ms", "packet_loss_percent", "status"]
+        for key in required_keys:
+            if key not in event:
+                raise KeyError(f"Missing required key: '{key}' in event → {event}")
+
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
@@ -104,7 +114,8 @@ def log_network_event(event):
     except Exception as e:
         print(f"[ERROR] log_network_event: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 # ---------------------------
 # Log system alert (anomaly, threshold breach)
