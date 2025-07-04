@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS system_metrics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     hostname TEXT NOT NULL,
+    os_platform TEXT,
     cpu_usage REAL,
     memory_usage REAL,
     disk_usage REAL,
@@ -27,16 +28,29 @@ CREATE TABLE IF NOT EXISTS network_logs (
     status TEXT                   -- success, fail, unreachable
 );
 
+-- Table to log process status --
+CREATE TABLE IF NOT EXISTS process_status (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hostname TEXT NOT NULL,
+    os_platform TEXT,
+    pid INTEGER,
+    process_name TEXT,
+    raw_status TEXT,
+    normalized_status TEXT,
+    cpu_percent REAL,
+    memory_percent REAL
+);
+
 -- Table for service status monitoring
 CREATE TABLE IF NOT EXISTS service_status (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    host TEXT NOT NULL,
+    hostname TEXT NOT NULL,
+    os_platform TEXT NOT NULL,
     service_name TEXT NOT NULL,
-    status TEXT NOT NULL,         -- running, stopped, paused, etc.
-    start_time DATETIME,          -- when the service started
-    exit_code INTEGER,            -- optional: for debugging
-    error_message TEXT            -- if crashed or failed to start
+    raw_status TEXT NOT NULL,                 -- running, stopped, paused, etc.
+    normalized_status TEXT NOT NULL           -- human readble status
 );
 
 -- Table to log system alerts and anomalies
@@ -49,3 +63,12 @@ CREATE TABLE IF NOT EXISTS alerts (
     message TEXT                  -- human-readable alert
 );
 
+-- Table to log recovery actions --
+CREATE TABLE IF NOT EXISTS recovery_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hostname TEXT,
+    service_name TEXT,
+    result TEXT,                 -- success or fail
+    error_message TEXT           -- optional error detail
+);

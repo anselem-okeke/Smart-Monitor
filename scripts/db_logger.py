@@ -5,6 +5,7 @@
 import sqlite3
 import os
 import json
+from datetime import datetime
 
 CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
 with open(CONFIG_PATH, "r") as f:
@@ -26,13 +27,14 @@ def log_system_metrics(metrics):
 
         cursor.execute("""
             INSERT INTO system_metrics (
-                timestamp, hostname, cpu_usage, memory_usage,
+                timestamp, hostname, os_platform, cpu_usage, memory_usage,
                 disk_usage, temperature, uptime, process_count, load_average
             ) VALUES (
-                CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
-        """, (
+        """, (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             metrics['hostname'],
+            metrics['os_platform'],
             metrics['cpu_usage'],
             metrics['memory_usage'],
             metrics['disk_usage'],
@@ -46,38 +48,74 @@ def log_system_metrics(metrics):
     except Exception as e:
         print(f"[ERROR] log_system_metrics: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 # ---------------------------
-# Log service status
+# Batch log process status
 # ---------------------------
-def log_service_status(service):
+def log_process_status_batch(processes):
     conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
-        cursor.execute("""
-            INSERT INTO service_status (
-                timestamp, host, service_name, status,
-                start_time, exit_code, error_message
-            ) VALUES (
-                CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?
-            )
-        """, (
-            service['host'],
-            service['service_name'],
-            service['status'],
-            service.get('start_time'),
-            service.get('exit_code'),
-            service.get('error_message')
-        ))
+        cursor.executemany("""
+            INSERT INTO process_status (
+                timestamp, hostname, os_platform, pid, process_name, raw_status, normalized_status, 
+                cpu_percent, memory_percent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            (
+                proc['timestamp'],
+                proc['hostname'],
+                proc['os_platform'],
+                proc['pid'],
+                proc['process_name'],
+                proc['raw_status'],
+                proc['normalized_status'],
+                proc['cpu_percent'],
+                proc['memory_percent']
+            ) for proc in processes
+        ])
 
         conn.commit()
     except Exception as e:
-        print(f"[ERROR] log_service_status: {e}")
+        print(f"[ERROR] log_process_status_batch: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
+
+# ---------------------------
+# Batch log service status
+# ---------------------------
+def log_service_status_batch(services):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.executemany("""
+            INSERT INTO service_status (
+                timestamp, hostname, os_platform, service_name, raw_status, normalized_status
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, [
+            (
+                svc['timestamp'],
+                svc['hostname'],
+                svc['os_platform'],
+                svc['service_name'],
+                svc['raw_status'],
+                svc['normalized_status']
+            ) for svc in services
+        ])
+
+        conn.commit()
+    except Exception as e:
+        print(f"[ERROR] log_service_status_batch: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 # ------------------------------------------
 # Log network event (ping, traceroute, etc.)
@@ -143,5 +181,6 @@ def log_alert(alert):
     except Exception as e:
         print(f"[ERROR] log_alert: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
