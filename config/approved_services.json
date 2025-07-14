@@ -1,0 +1,12 @@
+[
+  "nginx.service",
+  "ssh.service",
+  "docker.service",
+  "cron.service",
+  "postgresql.service",
+  "prometheus.service",
+  "grafana-server.service",
+  "icssvc",
+  "wuauserv",
+  "WinDefend"
+]

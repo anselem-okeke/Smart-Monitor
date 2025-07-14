@@ -97,8 +97,9 @@ def log_service_status_batch(services):
 
         cursor.executemany("""
             INSERT INTO service_status (
-                timestamp, hostname, os_platform, service_name, raw_status, normalized_status
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                timestamp, hostname, os_platform, service_name, raw_status, normalized_status, 
+                sub_state, service_type, unit_file_state, recoverable
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (
                 svc['timestamp'],
@@ -106,13 +107,48 @@ def log_service_status_batch(services):
                 svc['os_platform'],
                 svc['service_name'],
                 svc['raw_status'],
-                svc['normalized_status']
+                svc['normalized_status'],
+                svc['sub_state'],
+                svc['service_type'],
+                svc['unit_file_state'],
+                svc['recoverable']
             ) for svc in services
         ])
 
         conn.commit()
     except Exception as e:
         print(f"[ERROR] log_service_status_batch: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+# ------------------------------------------
+# Batch log recovery log
+# ------------------------------------------
+def log_recovery(service_name):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.executemany("""
+            INSERT INTO recovery_logs (
+                timestamp, hostname, os_platform, service_name, result, error_message
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, [
+            (
+                svc['timestamp'],
+                svc['hostname'],
+                svc['os_platform'],
+                svc['service_name'],
+                svc['result'],
+                svc['error_message']
+            ) for svc in service_name
+        ])
+
+        conn.commit()
+    except Exception as e:
+        print(f"[ERROR] log_recovery_status_batch: {e}")
     finally:
         if conn:
             conn.close()
@@ -183,4 +219,30 @@ def log_alert(alert):
     finally:
         if conn:
             conn.close()
+
+# ---------------------------
+# Log restart attempts
+# ---------------------------
+def log_restart_attempt(entry):
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO restart_attempts (
+                timestamp, hostname, service_name
+            ) VALUES (?, ?, ?)
+        """, (
+            entry['timestamp'],
+            entry['hostname'],
+            entry['service_name']
+        ))
+
+        conn.commit()
+    except Exception as e:
+        print(f"[ERROR] restart_attempts: {e}")
+    finally:
+        if conn:
+            conn.close()
+
 

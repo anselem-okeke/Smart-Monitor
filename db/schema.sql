@@ -50,7 +50,11 @@ CREATE TABLE IF NOT EXISTS service_status (
     os_platform TEXT NOT NULL,
     service_name TEXT NOT NULL,
     raw_status TEXT NOT NULL,                 -- running, stopped, paused, etc.
-    normalized_status TEXT NOT NULL           -- human readble status
+    normalized_status TEXT NOT NULL,           -- human readble status
+    sub_state TEXT,                           -- systemd SubState (e.g. running, dead)
+    service_type TEXT,                        -- systemd Type (e.g. simple, forking)
+    unit_file_state TEXT,                     -- enabled, static, masked, linked
+    recoverable BOOLEAN DEFAULT FALSE         -- Whether it’s safe to restart
 );
 
 -- Table to log system alerts and anomalies
@@ -68,7 +72,16 @@ CREATE TABLE IF NOT EXISTS recovery_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     hostname TEXT,
-    service_name TEXT,
+    os_platform TEXT NOT NULL,
+    service_name TEXT NOT NULL,
     result TEXT,                 -- success or fail
     error_message TEXT           -- optional error detail
 );
+
+-- Table to log restart attempts --
+CREATE TABLE IF NOT EXISTS restart_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hostname TEXT NOT NULL,
+    service_name TEXT NOT NULL
+)

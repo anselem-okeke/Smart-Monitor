@@ -21,7 +21,7 @@ def normalize_status(os_platform, raw_status):
         else:
             return "unknown"
     elif os_platform == "Linux":
-        active_states = ["running", "sleeping", "disk-sleep", "idle"]
+        active_states = ["running", "sleeping", "disk-sleep", "idle", "listening"]
         stopped_states = ["stopped"]
         zombie_states = ["zombie", "dead"]
 
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         while True:
             process_data = collect_process_status()
             log_process_status_batch(process_data)
-            print("[INFO] Process status logged successfully")
+            print(f"[INFO] {len(process_data)} processes logged successfully")
             time.sleep(60)
     except KeyboardInterrupt:
         print("[INFO] Process monitory stopped by user.")

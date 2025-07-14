@@ -36,15 +36,15 @@
     "method": "ping"
   },
   {
-    "target": "192.168.56.16",
+    "target": "192.168.10.1",
     "method": "ping"
   },
   {
-    "target": "192.168.56.16",
+    "target": "192.168.10.1",
     "method": "traceroute"
   },
   {
-    "target": "192.168.56.16",
+    "target": "192.168.10.1",
     "method": "nslookup"
   },
     {
@@ -54,5 +54,19 @@
   {
     "target": "192.168.56.13",
     "method": "ping"
+  },
+  {
+    "target": "fake9876543210notrealexample.com",
+    "method": "traceroute"
+  },
+  {
+    "target": "fake9876543210notrealexample.com",
+    "method": "nslookup"
+  },
+    {
+    "target": "fake9876543210notrealexample.com",
+    "method": "ping"
   }
 ]
+
+

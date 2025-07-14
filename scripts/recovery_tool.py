@@ -38,6 +38,7 @@ def get_valid_sytemd_services():
     except Exception as e:
         print(f"[ERROR] get_valid_systemd_services: {e}")
         return set()
+
 def get_valid_window_services():
     try:
         result = subprocess.run(
@@ -60,7 +61,7 @@ def get_stopped_services():
         cursor.execute("""
             SELECT DISTINCT service_name
             FROM service_status
-            WHERE status = 'stopped' AND host = ?
+            WHERE normalized_status = 'stopped' AND hostname = ?
             ORDER BY timestamp DESC
         """, (hostname,))
         rows = cursor.fetchall()
@@ -158,6 +159,8 @@ def attempt_recovery(service_name):
             "source": f"recovery:{service_name}",
             "message": f"Recovery failed: {e}"
         })
+
+"""PLEASE DONT USE....................."""
 
 # def restart_service(service_name):
 #     if too_many_failures(service_name):
