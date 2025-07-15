@@ -223,7 +223,18 @@ def recent_system_metrics(hostname, minutes):
         cur = conn.cursor()
         cur.execute(sql, (threshold, hostname))
         return cur.fetchall()
-print(recent_system_metrics(socket.gethostname(), minutes=300))
+# print(recent_system_metrics(socket.gethostname(),minutes=50))
+
+def recovery_fail_count(host, service_name, minutes) -> bool:
+    threshold = (datetime.utcnow() - timedelta(minutes=minutes)
+          ).strftime("%Y-%m-%d %H:%M:%S")
+    sql = """SELECT COUNT(*) FROM recovery_logs
+                WHERE hostname=? AND service_name=?
+                AND result='fail' AND timestamp > ?"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (host, service_name, threshold))
+        return cur.fetchone()[0]
 
 
 

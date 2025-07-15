@@ -15,7 +15,7 @@ def collect_system_metrics():
     os_platform = platform.system()
     cpu_usage = psutil.cpu_percent(interval=1)
     memory_usage = psutil.virtual_memory().percent
-    disk_usage = psutil.disk_usage('/').percent
+    disk_usage = get_disk_usage()
     temperature = get_temperature()
     uptime = int(time.time() - psutil.boot_time())
     process_count = len(psutil.pids())
@@ -45,7 +45,12 @@ def get_temperature():
     return None
 
 def get_load_average():
-    return None if platform.system() == "Windodows" else psutil.getloadavg()[0]
+    return f"Not Available" if platform.system() == "Windodows" else psutil.getloadavg()[0]
+
+def get_disk_usage():
+    if platform.system() == "Windows":
+        return psutil.disk_usage("C:\\").percent
+    return psutil.disk_usage('/').percent
 
 if __name__ == "__main__":
     print("[INFO] Starting Smart Factory Monitor...")
