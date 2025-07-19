@@ -28,9 +28,9 @@ def log_system_metrics(metrics):
         cursor.execute("""
             INSERT INTO system_metrics (
                 timestamp, hostname, os_platform, cpu_usage, memory_usage,
-                disk_usage, temperature, uptime, process_count, load_average
+                disk_usage, temperature, uptime, process_count, load_average, inode_usage
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
         """, (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             metrics['hostname'],
@@ -41,7 +41,8 @@ def log_system_metrics(metrics):
             metrics['temperature'],
             metrics['uptime'],
             metrics['process_count'],
-            metrics['load_average']
+            metrics['load_average'],
+            metrics['inode_usage']
         ))
 
         conn.commit()
@@ -245,4 +246,20 @@ def log_restart_attempt(entry):
         if conn:
             conn.close()
 
-
+# ---------------------------
+# Adding inode_usage into log system metrics
+# ---------------------------
+def create_inode_usage_column():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE system_metrics ADD COLUMN inode_usage REAL;")
+        print("[INFO] Column 'inode_usage' added.")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e).lower():
+            print("[INFO] column inode_usage already exits")
+        else:
+            print(f"[ERROR] {e}")
+    finally:
+        conn.commit()
+        conn.close()

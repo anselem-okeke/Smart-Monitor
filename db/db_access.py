@@ -236,6 +236,60 @@ def recovery_fail_count(host, service_name, minutes) -> bool:
         cur.execute(sql, (host, service_name, threshold))
         return cur.fetchone()[0]
 
+def recent_inode_usage(host, minutes=10):
+    """
+
+    :param host: current host
+    :param minutes: current timestamp within N minutes
+    :return: (timestamp, inode_usage) rows in N minutes
+    """
+    t = (datetime.utcnow() - timedelta(minutes=minutes)
+         ).strftime("%Y-%m-%d %H:%M:%S")
+    sql = """SELECT timestamp, inode_usage
+                FROM system_metrics
+                WHERE timestamp > ? AND hostname = ?
+                ORDER BY timestamp DESC"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (t, host))
+        return cur.fetchall()
+inode_rows = recent_inode_usage(socket.gethostname())
+inode_latest = inode_rows[0]
+inode_latest2 = inode_latest[1]
+print(inode_latest2,inode_latest)
+
+WARN_INODE = 90
+CRIT_INODE = 95
+
+def is_inode_exhausted(row) -> bool:
+    """
+
+    :param row: timestamp, inode_usage
+    :return: bool
+    """
+    _ts, inode_pct = row
+    return inode_pct is not None and inode_pct >= WARN_INODE
+
+print(is_inode_exhausted(inode_latest))
+
+
+
+def recent_alert_exist(host, source, minutes):
+    """
+
+    :param host:
+    :param source:
+    :param minutes:
+    :return: Return True if an alert for source was logged with N minutes
+    """
+    threshold = (datetime.utcnow() - timedelta(minutes=minutes)
+                 ).strftime("%Y-%m-%d %H:%M:%S")
+    sql = "SELECT 1 FROM alerts WHERE hostname=? AND source=? AND timestamp>? LIMIT 1"
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (host, source, threshold))
+        return cur.fetchone() is not None
+
 
 
 

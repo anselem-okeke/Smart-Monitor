@@ -21,3 +21,4 @@ def is_root_readonly() -> bool:
         pass  # non-Linux (Windows) → fall through
     return False
 
+

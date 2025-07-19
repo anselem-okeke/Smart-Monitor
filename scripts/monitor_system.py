@@ -1,14 +1,14 @@
 #------------------------------------------
 """Author: Anselem Okeke"""
 #------------------------------------------
-
+import os
 import platform
 import socket
 import time
 
 import psutil
 import subprocess
-from db_logger import log_system_metrics
+from db_logger import log_system_metrics, create_inode_usage_column
 
 def collect_system_metrics():
     hostname = socket.gethostname()
@@ -30,7 +30,8 @@ def collect_system_metrics():
         "temperature": temperature,
         "uptime": uptime,
         "process_count": process_count,
-        "load_average": load_avg
+        "load_average": load_avg,
+        "inode_usage": get_inode_usage()
     }
 
 def get_temperature():
@@ -52,15 +53,49 @@ def get_disk_usage():
         return psutil.disk_usage("C:\\").percent
     return psutil.disk_usage('/').percent
 
+def get_inode_usage():
+    """
+    Each file or directory on a Linux filesystem has an inode that contains:
+     - File type (regular file, directory, symlink, etc.)
+     - Permissions (read/write/execute)
+     - Owner and group
+     - File size
+     - Timestamps (created, modified, accessed)
+     - Number of hard links
+     - Disk block pointers (where the actual data is stored)
+    Why are inodes important in disk recovery?
+      - Even if your disk has free space, if you run out of inodes, you can't create new files.
+    Symptoms of inode exhaustion:
+      - You can't create files despite having free space (No space left on device)
+      - Heavy logging systems stop writing logs
+      - df -h shows free space, but df -i shows 100% inode usage
+    Causes:
+      - Millions of small files (e.g., logs, temp files, cache)
+      - Backup scripts that create many files without cleanup
+      - Misconfigured apps writing excessive files (especially in /tmp, /var/log, or /var/cache)
+    :return:
+      st.f_files = total number of inodes
+      st.f_ffree = free inodes
+      st.f_files - st.f_ffree = used inodes
+      the formula returns: (used inodes / total inodes) * 100 as a percentage
+    """
+    if platform.system() != "Linux":
+        return None
+    st = os.statvfs("/")
+    return round(100 * (st.f_files - st.f_ffree) / st.f_files, 2)
+
+
 if __name__ == "__main__":
     print("[INFO] Starting Smart Factory Monitor...")
+    # creating inode_usage
+    create_inode_usage_column()
     try:
         while True:
             # System metrics
             metrics = collect_system_metrics()
             log_system_metrics(metrics)
 
-            print("[INFO] Sytem Metrics logged successfully.")
+            print("[INFO] System Metrics logged successfully.")
             time.sleep(60)
     except KeyboardInterrupt:
         print("[INFO] Smart Factory Monitor stopped by user.")

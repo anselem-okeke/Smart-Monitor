@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS system_metrics (
     temperature REAL,
     uptime INTEGER,               -- in seconds
     process_count INTEGER,
-    load_average REAL
+    load_average REAL,
+    inode_usage REAL
 );
 
 -- Table for network connectivity logs
