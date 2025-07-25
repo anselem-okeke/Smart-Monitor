@@ -2,6 +2,7 @@ import logging
 import pathlib
 
 LOG_DIR  = pathlib.Path(__file__).resolve().parents[1] / "logs"
+print(LOG_DIR)
 LOG_DIR.mkdir(exist_ok=True)
 LOGFILE = LOG_DIR / "network_recovery.log"
 

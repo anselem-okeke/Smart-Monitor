@@ -346,7 +346,7 @@ def attempt_service_recovery():
         return  # process only ONE service this cycle
 
     # If no services needed recovery
-    print("[INFO] No stopped/failed services detected this cycle.")
+    print("[INFO] No stopped/failed services detected in this cycle.")
 
 
 # -------------------------

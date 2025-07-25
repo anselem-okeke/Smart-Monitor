@@ -2017,3 +2017,16 @@
 2025-07-19 17:21:11,870  WARNING  hostname=web01 action=inode-clean result=success
 2025-07-19 17:22:12,338  WARNING  hostname=web01 action=inode-clean result=success
 2025-07-19 18:17:09,291  WARNING  hostname=web01 action=inode-clean result=success
+2025-07-21 01:57:11,733  WARNING  hostname=web01 action=inode-clean result=success
+2025-07-21 02:30:35,701  WARNING  hostname=web01 action=inode-clean result=success
+2025-07-21 05:05:21,149  WARNING  hostname=web01 action=inode-clean result=success
+2025-07-25 05:10:59,046  CRITICAL  host=WIN-MGDRT0C3OF3 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 05:11:58,851  CRITICAL  host=WIN-MGDRT0C3OF3 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 05:12:56,612  CRITICAL  host=WIN-MGDRT0C3OF3 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 05:13:54,269  CRITICAL  host=WIN-MGDRT0C3OF3 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 05:14:55,069  CRITICAL  host=WIN-MGDRT0C3OF3 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 03:18:49,801  CRITICAL  host=web01 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 03:19:50,053  CRITICAL  host=web01 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 03:20:50,573  CRITICAL  host=web01 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 03:21:51,312  CRITICAL  host=web01 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']
+2025-07-25 03:22:51,560  CRITICAL  host=web01 action=smartctl_alert disks=['/dev/sdfake0', '/dev/sdfake1']

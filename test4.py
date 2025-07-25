@@ -67,3 +67,6 @@ def high_node_dirs():
 for path in high_node_dirs():
     if os.path.exists(path):
         delete_old_files(path, TMP_DAYS)
+
+
+
