@@ -36,7 +36,7 @@ def high_node_dirs():
     High_INODE_DIRS = [
         "/tmp",
         "/var/tmp",
-        "/var/log",
+       # "/var/log",
         "/var/cache",
         "/var/spool",
         "/var/lib/docker",

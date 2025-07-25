@@ -62,19 +62,28 @@ def free_disk_space_linux() -> int:
 
         #2. delete /var/log/*.gz older than LOG_DAYS
         print("[INFO] Cleaning /var/log files...")
-        subprocess.call(["sudo", "find", "/var/log", "-name", "*.gz",
-                         "-mtime", str(LOG_DAYS), "-print", "-delete"])
+        subprocess.call([
+            "sudo", "find", "/var/log",
+            "-name", "*.gz", "-mtime",
+            str(LOG_DAYS), "-print", "-delete"
+        ])
 
         # 3. clean /tmp files older than TMP_DAYS
         print("[INFO] Cleaning /tmp files...")
-        subprocess.call(["sudo", "find", "/tmp",
-                         "-type", "f", "-mtime",
-                         str(TMP_DAYS), "-print", "-delete"])
+        subprocess.call([
+            "sudo", "find",
+            "/tmp", "-type", "f", "-mtime",
+             str(TMP_DAYS), "-print", "-delete"
+        ])
 
         # 4. delete /var/log/*.img older than LOG_DAYS/simulated disk_usage for testing
         print("[INFO] Cleaning /var/log img files...")
-        subprocess.call(["sudo", "find", "/var/log", "-name", "*.img",
-                         "-mtime", str(LOG_DAYS), "-print", "-delete"])
+        subprocess.call([
+            "sudo", "find",
+            "/var/log", "-name", "*.img",
+             "-mtime", str(LOG_DAYS),
+             "-print", "-delete"
+        ])
     except Exception as e:
         print(f"[ERROR] Linux cleanup failed: {e}")
     time.sleep(1)
