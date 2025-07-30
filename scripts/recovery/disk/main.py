@@ -24,7 +24,6 @@ from datetime import datetime
 _last_failure = None
 hostname = socket.gethostname()
 
-
 def handle_disk():
     global _last_failure
 

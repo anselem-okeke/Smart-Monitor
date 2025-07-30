@@ -1,0 +1,23 @@
+{
+  "cpu": {
+    "warn": 90,
+    "crit": 95,
+    "consecutive": 3,
+    "kill_whitelist": ["chrome", "my_leaky_simulation", "System Idle Process", "python.exe"],
+    "kill_blacklist": {
+      "Windows": [
+        "system", "csrss.exe", "lsass.exe", "wininit.exe",
+        "services.exe", "smss.exe", "svchost.exe", "explorer.exe", "winlogon.exe"
+      ],
+      "Linux": [
+        "systemd", "init", "sshd", "bash", "login",
+        "dbus-daemon", "rsyslogd", "cron", "journald", "Xorg",
+        "kthreadd", "kworker", "kswapd", "rcu_sched", "rcu_bh"
+      ]
+    },
+    "post_verify_sleep_sec": 15,
+    "throttle_minutes": 30,
+    "max_actions_in_window": 2,
+    "dry_run": true
+  }
+}

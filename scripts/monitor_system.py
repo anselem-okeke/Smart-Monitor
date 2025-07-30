@@ -11,6 +11,21 @@ import subprocess
 from db_logger import log_system_metrics, create_inode_usage_column
 
 def collect_system_metrics():
+    """
+    | Metric          | Source                             | Type        | Units            | Example                 |
+    | --------------- | ---------------------------------- | ----------- | ---------------- | ----------------------- |
+    | `hostname`      | `socket.gethostname()`             | string      | –                | `"web01"`               |
+    | `os_platform`   | `platform.system()`                | string      | –                | `"Windows"` / `"Linux"` |
+    | `cpu_usage`     | `psutil.cpu_percent(interval=1)`   | float       | **%**            | `27.5`                  |
+    | `memory_usage`  | `psutil.virtual_memory().percent`  | float       | **%**            | `43.1`                  |
+    | `disk_usage`    | `get_disk_usage()`                 | float       | **%**            | `68.2`                  |
+    | `temperature`   | `get_temperature()`                | float       | **°C** (or None) | `47.5`                  |
+    | `uptime`        | `time.time() - psutil.boot_time()` | float → int | **seconds**      | `86400` (1 day)         |
+    | `process_count` | `len(psutil.pids())`               | int         | **count**        | `97`                    |
+    | `load_avg`      | `get_load_average()`               | tuple       | system-dependent | `(0.1, 0.2, 0.3)`       |
+
+    :return:
+    """
     hostname = socket.gethostname()
     os_platform = platform.system()
     cpu_usage = psutil.cpu_percent(interval=1)

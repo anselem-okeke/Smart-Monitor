@@ -270,6 +270,25 @@ def recent_alert_exist(host, source, minutes):
         cur.execute(sql, (host, source, threshold))
         return cur.fetchone() is not None
 
+def recent_cpu_samples(host, samples=3, minutes=5):
+    """
+    Return the last `samples` rows (timestamp, cpu_usage) within `minutes`.
+    Ordered newest first.
+    """
+    from datetime import datetime, timedelta
+    threshold = (datetime.utcnow() - timedelta(minutes=minutes)
+                ).strftime("%Y-%m-%d %H:%M:%S")
+    sql = """SELECT timestamp, cpu_usage
+             FROM system_metrics
+             WHERE timestamp > ? AND hostname = ?
+             ORDER BY timestamp DESC
+             LIMIT ?"""
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (threshold, host, samples))
+        return cur.fetchall()
+
+
 
 
 
