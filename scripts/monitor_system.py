@@ -7,8 +7,7 @@ import socket
 import time
 
 import psutil
-import subprocess
-from db_logger import log_system_metrics, create_inode_usage_column
+from db_logger import log_system_metrics, create_inode_usage_column, create_swap_usage_column
 
 def collect_system_metrics():
     """
@@ -35,6 +34,8 @@ def collect_system_metrics():
     uptime = int(time.time() - psutil.boot_time())
     process_count = len(psutil.pids())
     load_avg = get_load_average()
+    inode_usage = get_inode_usage()
+    swap = psutil.swap_memory().percent
 
     return {
         "hostname": hostname,
@@ -46,7 +47,8 @@ def collect_system_metrics():
         "uptime": uptime,
         "process_count": process_count,
         "load_average": load_avg,
-        "inode_usage": get_inode_usage()
+        "inode_usage": inode_usage,
+        "swap_usage": swap
     }
 
 def get_temperature():
@@ -83,7 +85,7 @@ def get_inode_usage():
     Symptoms of inode exhaustion:
       - You can't create files despite having free space (No space left on device)
       - Heavy logging systems stop writing logs
-      - df -h shows free space, but df -i shows 100% inode usage
+      - df -h shows free disk space, but df -i shows 100% inode usage
     Causes:
       - Millions of small files (e.g., logs, temp files, cache)
       - Backup scripts that create many files without cleanup
@@ -104,6 +106,8 @@ if __name__ == "__main__":
     print("[INFO] Starting Smart Factory Monitor...")
     # creating inode_usage
     create_inode_usage_column()
+    #creating Column swap_usage
+    create_swap_usage_column()
     try:
         while True:
             # System metrics

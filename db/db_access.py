@@ -288,6 +288,27 @@ def recent_cpu_samples(host, samples=3, minutes=5):
         cur.execute(sql, (threshold, host, samples))
         return cur.fetchall()
 
+def recent_memory_samples(host, samples=3, minutes=3):
+    """
+    :param host:
+    :param samples:
+    :param minutes:
+    :return:
+        Return last `samples` rows (timestamp, memory_usage, swap_usage)
+        within `minutes`. Newest first.
+    """
+    t = (datetime.utcnow() - timedelta(minutes=minutes)
+         ).strftime("%Y-%m-%d %H:%M:%S")
+    sql = """SELECT timestamp, memory_usage, swap_usage
+                FROM system_metrics
+                WHERE timestamp > ? AND hostname = ?
+                ORDER BY timestamp DESC
+                LIMIT ?"""
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (t, host, samples))
+        return cur.fetchall()
 
 
 

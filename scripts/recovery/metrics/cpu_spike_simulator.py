@@ -46,25 +46,6 @@ def run_cpu_stress(proc_name="my_leaky_simulation"):
     print("[INFO] CPU stress simulation complete...")
 
 
-
-#
-# #main
-# def run_cpu_stress(proc_name="my_leaky_simulation"):
-#     print(f"[INFO] Lauching {NUM_CORES} CPU hog processes for {CPU_LOAD_TIME} seconds...")
-#     procs = []
-#     for _ in range(NUM_CORES):
-#         p = multiprocessing.Process(target=cpu_hog, args=(proc_name,))
-#         p.start()
-#         procs.append(p)
-#
-#     time.sleep(CPU_LOAD_TIME)
-#
-#     print(f"[INFO] Terminating stress processes for {NUM_CORES}...")
-#     for p in procs:
-#         p.terminate()
-#         p.join()
-#     print("[INFO] CPU stress simulation complete...")
-
 def stress_linux():
     if shutil.which("stress") is None:
         print("[INFO] Installing stress tool...")
