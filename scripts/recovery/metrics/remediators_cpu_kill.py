@@ -1,3 +1,4 @@
+import ctypes
 import sys
 import os
 
@@ -22,7 +23,6 @@ BLACKLIST = [p.lower() for p in CPU.get("kill_blacklist", {}).get(OS, [])]
 def _is_admin():
     if platform.system() == "Windows":
         try:
-            import ctypes
             return ctypes.windll.shell32.IsUserAnAdmin() != 0
         except Exception as e:
             return False, str(e)

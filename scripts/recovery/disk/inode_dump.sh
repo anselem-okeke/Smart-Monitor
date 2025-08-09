@@ -14,4 +14,3 @@ for d in {1..100}; do
     touch dir_"$d"/file_"$f"
   done
 done
-
