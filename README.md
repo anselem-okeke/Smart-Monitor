@@ -2,7 +2,8 @@
 
 ### Motivation for Developing Smart-Monitor
 
-In many production environments I have worked in, monitoring tools like **Prometheus** or **Grafana** provide excellent
+In many production environments I have worked in, whether in **Site Reliability**, **DevOps**, or **Platform Engineering** 
+roles, I have seen the same recurring pattern. Monitoring tools like **Prometheus** or **Grafana** provide excellent
 visibility, but they don’t actively *do* anything to fix issues in real time. This often leaves engineers in reactive
 mode, receiving alerts at **3 AM** for problems that could have been resolved automatically.
 
