@@ -1,14 +1,20 @@
 #------------------------------------------
 """Author: Anselem Okeke"""
 #------------------------------------------
-
+import os
 import platform
 import socket
+import sys
 import time
 
 import psutil
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from datetime import datetime
-from db_logger import log_process_status_batch
+from db.db_logger import log_process_status_batch
 
 def normalize_status(os_platform, raw_status):
     raw_status = raw_status.lower()

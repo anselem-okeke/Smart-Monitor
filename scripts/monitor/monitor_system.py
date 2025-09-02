@@ -4,10 +4,15 @@
 import os
 import platform
 import socket
+import sys
 import time
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 import psutil
-from db_logger import log_system_metrics, create_inode_usage_column, create_swap_usage_column
+from db.db_logger import log_system_metrics, create_inode_usage_column, create_swap_usage_column
 
 def collect_system_metrics():
     """

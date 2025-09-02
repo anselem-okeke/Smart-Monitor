@@ -7,7 +7,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 import os, platform, psutil, subprocess, socket, time, json, pathlib
-from scripts.db_logger import log_recovery
+from db.db_logger import log_recovery
 from utils.network_file_logger import net_log
 from db.db_access import recovery_fail_count
 from datetime import datetime

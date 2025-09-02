@@ -4901,3 +4901,462 @@
 2025-07-24 16:41:18 | WIN-MGDRT0C3OF3 | wercplsupport | stopped | unknown | unknown | unknown | Not in approved_services
 2025-07-24 16:41:18 | WIN-MGDRT0C3OF3 | WerSvc | stopped | unknown | unknown | unknown | Not in approved_services
 2025-07-24 16:41:18 | WIN-MGDRT0C3OF3 | WiaRpc | stopped | unknown | unknown | unknown | Not in approved_services
+2025-09-02 14:36:11 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:36:11 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:36:11 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:36:11 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:11 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:36:12 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:36:12 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:36:12 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:36:12 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:36:12 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:36:12 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:36:12 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:36:12 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:36:12 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:36:12 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:36:12 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:49:37 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:49:37 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:49:37 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:49:37 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:49:37 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:49:37 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:49:37 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:49:37 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:50:44 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:50:44 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:50:44 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:50:44 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:50:44 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:50:44 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:50:44 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:50:44 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:51:49 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:51:49 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:51:49 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:51:49 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:51:49 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:51:49 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:51:49 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:51:49 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:52:55 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:52:55 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:52:55 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:52:55 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:52:55 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:52:55 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:52:55 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:52:55 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:54:00 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:54:00 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:54:00 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:54:00 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:54:00 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:54:00 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:54:00 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:54:00 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:55:06 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:06 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:06 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:06 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:06 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:55:06 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:55:06 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:55:07 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:55:07 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:55:07 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:55:07 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:55:07 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:55:07 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:55:07 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:56:11 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:56:11 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:56:11 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:56:11 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:56:11 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:56:11 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:56:11 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:56:11 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services
+2025-09-02 14:57:16 | web01 | apport-autoreport.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | apt-daily-upgrade.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | apt-daily.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | apt-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | atd.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | atop.service | failed | failed | simple | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | bolt.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | cloud-init-hotplugd.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | cloud-init.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | console-getty.service | stopped | dead | idle | disabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | cryptdisks-early.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:57:16 | web01 | cryptdisks.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:57:16 | web01 | dbus-org.freedesktop.hostname1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | dbus-org.freedesktop.locale1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | dbus-org.freedesktop.timedate1.service | stopped | dead | dbus | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | dbus-org.freedesktop.timesync1.service | stopped | dead | notify | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | debug-shell.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | dm-event.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | dmesg.service | stopped | dead | idle | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | e2scrub_all.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | e2scrub_reap.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | emergency.service | stopped | dead | idle | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | esm-cache.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | friendly-recovery.service | stopped | dead | notify | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | fstrim.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | fwupd-offline-update.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | fwupd-refresh.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | getty-static.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | grub-common.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | grub-initrd-fallback.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | hwclock.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:57:16 | web01 | initrd-cleanup.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | initrd-parse-etc.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | initrd-switch-root.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | initrd-udevadm-cleanup-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | iscsi.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | iscsid.service | stopped | dead | forking | disabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | kubelet.service | stopped | dead | simple | disabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | logrotate.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | lvm2-lvmpolld.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | lvm2.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:57:16 | web01 | lxd-agent-9p.service | stopped | dead | oneshot | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | lxd-agent.service | stopped | dead | simple | enabled | Not in approved_services
+2025-09-02 14:57:16 | web01 | man-db.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | mdcheck_continue.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | mdcheck_start.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | mdmonitor-oneshot.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | mdmonitor.service | stopped | dead | simple | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | motd-news.service | stopped | dead | oneshot | static | Not in approved_services
+2025-09-02 14:57:16 | web01 | multipath-tools-boot.service | stopped | dead |  | masked | Not in approved_services
+2025-09-02 14:57:16 | web01 | netplan-ovs-cleanup.service | stopped | dead | oneshot | enabled-runtime | Not in approved_services

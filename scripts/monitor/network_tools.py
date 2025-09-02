@@ -6,11 +6,16 @@ import os
 import platform
 import socket
 import subprocess
+import sys
 import time
 
-from db_logger import log_network_event, log_alert
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/hosts_config.json"))
+from db.db_logger import log_network_event, log_alert
+
+CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../config/hosts_config.json"))
 
 def extract_packet_loss(output, system):
     try:

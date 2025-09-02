@@ -16,7 +16,7 @@ if PROJECT_ROOT not in sys.path:
 
 from datetime import datetime
 from utils.network_file_logger import net_log
-from scripts.db_logger import log_recovery
+from db.db_logger import log_recovery
 from db.db_access import recovery_fail_count
 
 

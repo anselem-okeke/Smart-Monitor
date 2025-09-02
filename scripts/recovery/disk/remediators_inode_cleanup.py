@@ -11,7 +11,7 @@ import subprocess
 from datetime import datetime
 from utils.network_file_logger import net_log
 from db.db_access import recovery_fail_count
-from scripts.db_logger import log_recovery
+from db.db_logger import log_recovery
 
 
 hostname = socket.gethostname()

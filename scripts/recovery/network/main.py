@@ -10,7 +10,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from db.db_access import recent_failed_network_events
-from scripts.db_logger import log_alert, log_recovery
+from db.db_logger import log_alert, log_recovery
 
 from scripts.recovery.network.classifiers_packet_loss import is_packet_loss_100
 from scripts.recovery.network.remediators_nic_bounce import bounce_suspect_nics

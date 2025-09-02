@@ -8,7 +8,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from db.db_access import recent_system_metrics
-from scripts.db_logger import log_alert
+from db.db_logger import log_alert
 from db.db_access import recent_inode_usage
 from scripts.recovery.disk.classifiers_disk_full import is_disk_full, CRIT_TH
 from scripts.recovery.disk.remediators_disk_cleanup import cleanup_disk, THROTTLE_MIN
