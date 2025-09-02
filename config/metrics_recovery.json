@@ -3,7 +3,7 @@
     "warn": 90,
     "crit": 95,
     "consecutive": 3,
-    "kill_whitelist": ["chrome", "my_leaky_simulation", "System Idle Process", "python.exe"],
+    "kill_whitelist": ["chrome", "my_leaky_simulation", "System Idle Process", "python.exe", "load_spike.sh"],
     "kill_blacklist": {
       "Windows": [
         "system", "csrss.exe", "lsass.exe", "wininit.exe",
@@ -25,7 +25,7 @@
     "warn": 80,
     "swap_threshold": 5,
     "consecutive": 2,
-    "kill_whitelist": ["chrome", "my_memory_simulation-3", "python.exe"],
+    "kill_whitelist": ["chrome", "my_memory_simulation-3", "python.exe", "load_spike.sh"],
     "kill_blacklist": {
       "Windows": [
         "system", "csrss.exe", "lsass.exe", "wininit.exe",
@@ -43,5 +43,28 @@
     "throttle_minutes": 30,
     "max_actions_in_window": 2,
     "dry_run": true
+  },
+
+  "load": {
+    "warn_multiplier": 2.0,
+    "crit_multiplier": 4.0,
+    "consecutive": 3,
+    "throttle_minutes": 15,
+    "post_verify_sleep_sec": 10,
+    "dry_run": true
+  },
+
+  "zombies": {
+    "min_total_procs": 100,
+    "ratio_warn": 0.05,
+    "ratio_crit": 0.10,
+    "abs_crit": 50,
+    "consecutive": 2,
+    "post_verify_sleep_sec": 10,
+    "throttle_minutes": 30,
+    "dry_run": false,
+
+    "restart_services": ["nginx", "apache2", "gunicorn"],
+    "kill_parent_whitelist": ["gunicorn", "celery", "zombie_simulator"]
   }
 }

@@ -117,7 +117,7 @@ if __name__ == "__main__":
             print("[INFO] System Metrics logged successfully.")
             time.sleep(60)
     except KeyboardInterrupt:
-        print("[INFO] Smart Factory Monitor stopped by user.")
+        print("[INFO] Smart Monitor stopped by user.")
 
 
 

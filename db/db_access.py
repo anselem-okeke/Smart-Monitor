@@ -310,6 +310,52 @@ def recent_memory_samples(host, samples=3, minutes=3):
         cur.execute(sql, (t, host, samples))
         return cur.fetchall()
 
+def recent_load_samples(host, samples=3, minutes=5):
+    """
+    :param host:
+    :param samples:
+    :param minutes:
+    :return: Returns last `samples` rows (timestamp, load_average) within `minutes`.
+    Newest first.
+    """
+    t = (datetime.utcnow() - timedelta(minutes=minutes)
+         ).strftime("%Y-%m-%d %H:%M:%S")
+    sql = """SELECT timestamp, load_average
+                 FROM system_metrics
+                 WHERE timestamp > ? AND hostname = ?
+                 ORDER BY timestamp DESC
+                 LIMIT ?"""
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (t, host, samples))
+        return cur.fetchall()
+
+def recent_process_samples(host, samples=3, minutes=5):
+    """
+
+    :param host:
+    :param samples:
+    :param minutes:
+    :return: Return last `samples` rows (timestamp, process_count) within `minutes`.
+    Newest first; gives context alongside live scan.
+    """
+
+    t = (datetime.utcnow() - timedelta(minutes=minutes)
+         ).strftime("%Y-%m-%d %H:%M:%S")
+    sql = """SELECT timestamp, process_count
+                FROM system_metrics
+                WHERE timestamp > ? AND hostname = ?
+                ORDER BY timestamp DESC
+                LIMIT ?"""
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (t, host, samples))
+        return cur.fetchall()
+
+
+
 
 
 

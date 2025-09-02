@@ -4,6 +4,17 @@ def is_memory_high(rows, warn_th, swap_th, consecutive):
     Trigger if at least `consecutive` samples have:
       • memory_usage >= warn_th  AND
       • swap_usage    >=  swap_th
+
+    | Concept                          | Explanation                                                                                                                                                                                                                           |
+    | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | **Swap space**                   | A reserved area on disk (Linux `swap partition` / `swapfile`, Windows **pagefile.sys**) that the OS uses as *overflow* for inactive memory pages when physical RAM is full.                                                           |
+    | **Memory pressure**              | When `memory_usage %` (actual RAM in use) climbs so high that the kernel starts paging data out to swap to create free RAM frames.                                                                                                    |
+    | **Swap-in / swap-out**           | • **Swap-out**: move a RAM page → disk (slow but frees RAM)<br>• **Swap-in**: bring it back when accessed (slower, causes latency spike).                                                                                             |
+    | **Why swap > 0 % is a red flag** | • Indicates RAM was *already* exhausted.<br>• Disk I/O is orders of magnitude slower than RAM → response times degrade.<br>• Heavy swapping can lead to “thrashing,” where CPU time is spent just paging data, not doing useful work. |
+    | **Kernel escalation**            | If swap + RAM both fill, Linux invokes the **OOM-killer**; Windows raises “low memory” and may terminate processes—both disruptive.                                                                                                   |
+    | **Good practice**                | • Keep swap **mostly idle** in normal operation (0–2 %).<br>• Alert when it rises (e.g., > 0 % *and* RAM ≥ 85 %).                                                                                                                     |
+    | **SRE remediation**              | 1. Identify leak or runaway process.<br>2. Restart/kill it or scale out.<br>3. Long term: add RAM, tune swappiness, set cgroup/Job limits.                                                                                            |
+
     """
     if len(rows) < consecutive:
         return False

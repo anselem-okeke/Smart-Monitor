@@ -74,4 +74,4 @@ if __name__ == '__main__':
             print(f"[INFO] {len(process_data)} processes logged successfully")
             time.sleep(60)
     except KeyboardInterrupt:
-        print("[INFO] Process monitory stopped by user.")
+        print("[INFO] Process monitor stopped by user.")
