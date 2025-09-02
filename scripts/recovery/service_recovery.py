@@ -269,11 +269,6 @@ def is_passive_or_oneshot_service(service_name):
         return False  # Assume recoverable if unknown
 
 
-
-
-
-
-
 def attempt_service_recovery():
     """Attempt to recover **one** failed service per call (sequential processing)."""
     platform_name = platform.system()
