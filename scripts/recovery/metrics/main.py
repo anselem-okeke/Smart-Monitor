@@ -22,7 +22,7 @@ from scripts.recovery.metrics.remediators_cpu_kill import kill_runaway_process, 
 from scripts.recovery.metrics.remediators_mem_cleanup import relieve_memory, top_mem_processes, log_top_mem_contributors
 from scripts.recovery.metrics.classifiers_zombie_flood import current_zombie_stats, is_zombie_flood
 from scripts.recovery.metrics.remediators_zombie_reap import attempt_reap
-from scripts.db_logger import log_alert
+from db.db_logger import log_alert
 from utils.network_file_logger import net_log
 
 hostname = socket.gethostname()

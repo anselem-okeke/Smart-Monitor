@@ -1,9 +1,15 @@
+import os
 import platform
 import socket
 import subprocess
+import sys
 import time
 
-from db_logger import log_service_status_batch
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from db.db_logger import log_service_status_batch
 
 from datetime import datetime
 

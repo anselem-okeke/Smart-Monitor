@@ -11,7 +11,7 @@ import platform
 import shutil
 import subprocess
 import time
-from scripts.db_logger import log_recovery
+from db.db_logger import log_recovery
 from utils.network_file_logger import net_log
 from datetime import datetime
 

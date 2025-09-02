@@ -133,7 +133,7 @@
 
 
 import os, sys
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
@@ -146,7 +146,7 @@ import time
 import traceback
 from datetime import datetime, timedelta
 from db.db_access import*
-from scripts.db_logger import log_alert, log_recovery, log_restart_attempt
+from db.db_logger import log_alert, log_recovery, log_restart_attempt
 from utils.config_utils import load_approved_services
 from utils.log_utils import log_unclassified_service
 
