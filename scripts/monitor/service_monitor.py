@@ -412,16 +412,19 @@ def collect_service_status():
         })
     return rows
 
+def handle_service_monitor():
+    batch = collect_service_status()
+    if batch:
+        log_service_status_batch(batch)
+        print(f"[INFO] Logged {len(batch)} service rows → DB; sleeping 60s...")
+    else:
+        print("[INFO] No services collected this cycle; sleeping 60s...")
+
 if __name__ == "__main__":
     print("[INFO] Service Monitor starting …")
     try:
         while True:
-            batch = collect_service_status()
-            if batch:
-                log_service_status_batch(batch)
-                print(f"[INFO] Logged {len(batch)} service rows → DB; sleeping 60s...")
-            else:
-                print("[INFO] No services collected this cycle; sleeping 60s...")
+            handle_service_monitor()
             time.sleep(60)
     except KeyboardInterrupt:
         print("[INFO] Service Monitor stopped by user.")

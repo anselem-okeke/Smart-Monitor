@@ -4,12 +4,13 @@ import platform
 import socket
 import sqlite3
 from datetime import  datetime, timedelta
+from db.core import DB_PATH
 
-CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
-with open(CONFIG_PATH, "r") as f:
-    config = json.load(f)
-
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../" + config["path"]))
+# CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
+# with open(CONFIG_PATH, "r") as f:
+#     config = json.load(f)
+#
+# DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../" + config["path"]))
 
 
 # def db_access_for_service_recovery():

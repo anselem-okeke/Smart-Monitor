@@ -173,16 +173,29 @@ def restart_service_windows(service_name):
     except Exception as e:
         return False, str(e)
 
-
-def restart_service_linux(service_name):
-    """Restart a systemd service on Linux."""
+def restart_service_linux(service_name: str):
+    """Restart a systemd service on Linux via safe wrapper (no password prompts)."""
     try:
-        result = subprocess.run(["sudo", "systemctl", "restart", service_name], capture_output=True, text=True)
+        result = subprocess.run(
+            ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
+            capture_output=True, text=True
+        )
         if result.returncode == 0:
-            return True, result.stdout.strip()
-        return False, result.stderr.strip()
+            return True, result.stdout.strip() or f"{service_name} restarted successfully"
+        return False, result.stderr.strip() or f"Failed to restart {service_name}"
     except Exception as e:
         return False, str(e)
+
+
+# def restart_service_linux(service_name):
+#     """Restart a systemd service on Linux."""
+#     try:
+#         result = subprocess.run(["sudo", "systemctl", "restart", service_name], capture_output=True, text=True)
+#         if result.returncode == 0:
+#             return True, result.stdout.strip()
+#         return False, result.stderr.strip()
+#     except Exception as e:
+#         return False, str(e)
 
 
 
@@ -343,6 +356,15 @@ def attempt_service_recovery():
     # If no services needed recovery
     print("[INFO] No stopped/failed services detected in this cycle.")
 
+def handle_service_recovery():
+    try:
+        attempt_service_recovery()
+    except Exception as exc:
+        print(f"[ERROR] attempt_service_recovery crashed: {exc}")
+        traceback.print_exc()
+        # wait before next service check
+    print("[INFO] Sleeping 60s …")
+
 
 # -------------------------
 # Main scheduler loop
@@ -351,13 +373,7 @@ if __name__ == "__main__":
     print("[INFO] Starting Service Recovery …")
     try:
         while True:
-            try:
-                attempt_service_recovery()
-            except Exception as exc:
-                print(f"[ERROR] attempt_service_recovery crashed: {exc}")
-                traceback.print_exc()
-            # wait before next service check
-            print("[INFO] Sleeping 60s …")
+            handle_service_recovery()
             time.sleep(60)
     except KeyboardInterrupt:
         print("[INFO] Service Recovery stopped by user.")

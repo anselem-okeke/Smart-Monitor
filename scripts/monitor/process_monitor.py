@@ -71,13 +71,16 @@ def collect_process_status():
             continue
     return processes
 
+def handle_process_monitor():
+    process_data = collect_process_status()
+    log_process_status_batch(process_data)
+    print(f"[INFO] {len(process_data)} processes logged successfully")
+
 if __name__ == '__main__':
     print("[INFO] Starting Process Monitory...")
     try:
         while True:
-            process_data = collect_process_status()
-            log_process_status_batch(process_data)
-            print(f"[INFO] {len(process_data)} processes logged successfully")
+            handle_process_monitor()
             time.sleep(60)
     except KeyboardInterrupt:
         print("[INFO] Process monitor stopped by user.")

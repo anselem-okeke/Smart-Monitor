@@ -71,6 +71,26 @@ def should_bounce_interface(iface):
         fails_ping_check(iface)
     )
 
+#NEW ALLOWING leastpriviledge user=smartmonitor
+# def bounce_interface_linux(iface: str):
+#     """
+#     Safely bounce a network interface via the smartmon-netctl wrapper.
+#     Requires sudoers: smartmonitor NOPASSWD: /usr/local/bin/smartmon-netctl
+#     """
+#     try:
+#         res = subprocess.run(
+#             ["sudo", "-n", "/usr/local/bin/smartmon-netctl", iface, "bounce"],
+#             capture_output=True, text=True, timeout=10
+#         )
+#         if res.returncode == 0:
+#             return True, (res.stdout.strip() or f"{iface} bounced")
+#         return False, (res.stderr.strip() or res.stdout.strip() or "netctl failed")
+#     except subprocess.TimeoutExpired:
+#         return False, f"timeout bouncing {iface}"
+#     except Exception as e:
+#         return False, str(e)
+
+
 def bounce_interface_linux(iface):
     try:
         subprocess.run(["sudo", "ip", "link", "set", iface, "down"], check=True)

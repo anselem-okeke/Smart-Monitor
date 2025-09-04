@@ -6,52 +6,93 @@ import sqlite3
 import os
 import json
 from datetime import datetime
+from pathlib import Path
+from db.core import DB_PATH, connect_rw
 
-CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
-with open(CONFIG_PATH, "r") as f:
-    config = json.load(f)
+import logging
 
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../" + config["path"]))
-print(f"[DEBUG] Connecting to DB at: {DB_PATH}")
+# CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
+# with open(CONFIG_PATH, "r") as f:
+#     config = json.load(f)
+#
+# DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../" + config["path"]))
+# print(f"[DEBUG] Connecting to DB at: {DB_PATH}")
 
-# ---------------------------
-# Log system metrics
-# ---------------------------
+
+
 def log_system_metrics(metrics):
-    conn = None
+    """
+    metrics should have keys:
+      hostname, os_platform, cpu_usage, memory_usage, disk_usage,
+      temperature, uptime, process_count, load_average, inode_usage, swap_usage
+    """
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        print("[DEBUG] Attempting to insert system metrics for host:", metrics.get("hostname"))
-
-        cursor.execute("""
-            INSERT INTO system_metrics (
-                timestamp, hostname, os_platform, cpu_usage, memory_usage,
-                disk_usage, temperature, uptime, process_count, load_average, inode_usage, swap_usage
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-        """, (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-            metrics['hostname'],
-            metrics['os_platform'],
-            metrics['cpu_usage'],
-            metrics['memory_usage'],
-            metrics['disk_usage'],
-            metrics['temperature'],
-            metrics['uptime'],
-            metrics['process_count'],
-            metrics['load_average'],
-            metrics['inode_usage'],
-            metrics['swap_usage']
-        ))
-
-        conn.commit()
+        with connect_rw() as conn:
+            conn.execute("""
+                INSERT INTO system_metrics (
+                    timestamp, hostname, os_platform, cpu_usage, memory_usage,
+                    disk_usage, temperature, uptime, process_count, load_average,
+                    inode_usage, swap_usage
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                metrics['hostname'],
+                metrics['os_platform'],
+                metrics['cpu_usage'],
+                metrics['memory_usage'],
+                metrics['disk_usage'],
+                metrics['temperature'],
+                metrics['uptime'],
+                metrics['process_count'],
+                metrics['load_average'],
+                metrics['inode_usage'],
+                metrics['swap_usage'],
+            ))
+            # context manager commits on successful block exit
+        print(f"[INFO] system_metrics insert OK → {DB_PATH}")
     except Exception as e:
+        # Make failures visible to the orchestrator logs
         print(f"[ERROR] log_system_metrics: {e}")
-    finally:
-        if conn:
-            conn.close()
+        raise
+
+# # ---------------------------
+# # Log system metrics
+# # ---------------------------
+# def log_system_metrics(metrics):
+#     conn = None
+#     try:
+#         conn = sqlite3.connect(DB_PATH)
+#         cursor = conn.cursor()
+#
+#         print("[DEBUG] Attempting to insert system metrics for host:", metrics.get("hostname"))
+#
+#         cursor.execute("""
+#             INSERT INTO system_metrics (
+#                 timestamp, hostname, os_platform, cpu_usage, memory_usage,
+#                 disk_usage, temperature, uptime, process_count, load_average, inode_usage, swap_usage
+#             ) VALUES (
+#                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+#             )
+#         """, (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+#             metrics['hostname'],
+#             metrics['os_platform'],
+#             metrics['cpu_usage'],
+#             metrics['memory_usage'],
+#             metrics['disk_usage'],
+#             metrics['temperature'],
+#             metrics['uptime'],
+#             metrics['process_count'],
+#             metrics['load_average'],
+#             metrics['inode_usage'],
+#             metrics['swap_usage']
+#         ))
+#
+#         conn.commit()
+#     except Exception as e:
+#         print(f"[ERROR] log_system_metrics: {e}")
+#     finally:
+#         if conn:
+#             conn.close()
 
 # ---------------------------
 # Batch log process status
@@ -192,6 +233,10 @@ def log_network_event(event):
     finally:
         if conn:
             conn.close()
+
+
+
+
 
 # ---------------------------
 # Log system alert (anomaly, threshold breach)

@@ -227,6 +227,45 @@ def run_nslook(target):
             "status": "error"
         }
 
+
+#NEW ADDING timeout in other not stuck handlers
+# def run_network_checks():
+#     from concurrent.futures import ThreadPoolExecutor, as_completed
+#     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+#         targets = json.load(f)
+#
+#     def dispatch(entry):
+#         m, t = entry["method"], entry["target"]
+#         if m == "ping":
+#             return ping_host(t)
+#         if m == "traceroute":
+#             return run_traceroute(t)
+#         if m == "nslookup":
+#             return run_nslook(t)
+#         return {"method": m, "target": t, "status": "error", "result": "unsupported"}
+#
+#     # Limit concurrency so we don’t overwhelm the host/DNS
+#     results = []
+#     with ThreadPoolExecutor(max_workers=4) as ex:
+#         futs = [ex.submit(dispatch, e) for e in targets]
+#         for fut in as_completed(futs):
+#             data = fut.result()
+#             log_network_event(data)
+#             if data["method"] == "ping":
+#                 check_for_alerts(data)
+#             elif data["method"] == "nslookup" and data["status"] in ("fail", "error"):
+#                 log_alert({
+#                     "hostname": data['hostname'],
+#                     "severity": "warning",
+#                     "source": f"nslookup:{data['target']}",
+#                     "message": f"DNS failure: {data['result'][:60]}..."
+#                 })
+#             print(f"[INFO] Logged {data['method']} to {data['target']}: {data['status']}")
+#             results.append(data)
+#     return results
+
+
+
 def run_network_checks():
     with open(CONFIG_PATH, "r") as f:
         targets = json.load(f)
@@ -257,11 +296,18 @@ def run_network_checks():
             })
         print(f"[INFO] Logged {method} to {target}: {data['status']}")
 
+def handle_network_tools():
+    """
+        Handler for network tools..
+    :return:
+    """
+    run_network_checks()
+
 if __name__ == "__main__":
     try:
         while True:
             print("[INFO] Starting network monitoring...")
-            run_network_checks()
+            handle_network_tools()
             time.sleep(60)  # run every 60 seconds
     except KeyboardInterrupt:
         pass

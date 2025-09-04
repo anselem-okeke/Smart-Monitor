@@ -1,0 +1,22 @@
+[Unit]
+Description=Smart-Monitor Orchestrator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run repo code with Python
+ExecStart=/usr/bin/python3 /vagrant/Smart-Monitor/main.py
+WorkingDirectory=/vagrant/Smart-Monitor
+# Load the environment vars from file env
+EnvironmentFile=-/etc/smart-monitor/env
+# Run as smartmonitor user for now (later: dedicated user)
+User=smartmonitor
+Group=smartmonitor
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+

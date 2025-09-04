@@ -106,6 +106,21 @@ def get_inode_usage():
     st = os.statvfs("/")
     return round(100 * (st.f_files - st.f_ffree) / st.f_files, 2)
 
+def handle_monitor_system():
+    """
+        Collect and log system metrics once...
+    :return:
+    """
+    # creating inode_usage
+    create_inode_usage_column()
+    # creating Column swap_usage
+    create_swap_usage_column()
+
+    # System metrics
+    metrics = collect_system_metrics()
+    log_system_metrics(metrics)
+    print("[INFO] System Metrics logged successfully.")
+
 
 if __name__ == "__main__":
     print("[INFO] Starting Smart Factory Monitor...")
@@ -116,10 +131,7 @@ if __name__ == "__main__":
     try:
         while True:
             # System metrics
-            metrics = collect_system_metrics()
-            log_system_metrics(metrics)
-
-            print("[INFO] System Metrics logged successfully.")
+            handle_monitor_system()
             time.sleep(60)
     except KeyboardInterrupt:
         print("[INFO] Smart Monitor stopped by user.")
