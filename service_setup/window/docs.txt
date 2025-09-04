@@ -1,0 +1,243 @@
+Dev run on Windows (PowerShell)
+
+   1.Create a data dir (like /var/lib/... on Linux):
+
+	New-Item -Force -ItemType Directory 'C:\ProgramData\SmartMonitor' | Out-Null
+
+
+   2.Set system env vars (so you don’t have to inline them every time):
+
+	setx SMARTMONITOR_DB_PATH "C:\ProgramData\SmartMonitor\smart_factory_monitor.db" /M
+	setx LOG_LEVEL "INFO" /M
+	setx PYTHONUNBUFFERED "1" /M
+
+
+   3.Close & reopen PowerShell to pick up the new env.
+
+   4.Dev run (new PowerShell window):
+
+	cd C:\path\to\Smart-Monitor
+	$env:SMARTMONITOR_DB_PATH  # should print C:\ProgramData\SmartMonitor\smart_factory_monitor.db
+	python .\main.py
+
+   5.Your existing restart_service_windows() using sc.exe is fine. For actions that need admin (restarts, firewall), run the dev shell as Administrator.
+
+
+
+
+
+Run as a Windows Service (recommended: NSSM)
+
+   1.Here’s a ready-to-use PowerShell installer script for Windows. It sets up Smart-Monitor as a Windows service with NSSM and makes it easy to start/stop.
+
+
+   2.Save this as install_service.ps1, (adjust Python + repo path if needed)
+
+
+	# install_service.ps1
+	param(
+    	[string]$ServiceName = "SmartMonitor",
+    	[string]$PythonExe   = "C:\Python312\python.exe",            # adjust if your python.exe is elsewhere
+    	[string]$AppPath     = "C:\vagrant\Smart-Monitor\main.py",   # adjust to where main.py lives
+    	[string]$AppDir      = "C:\vagrant\Smart-Monitor",
+    	[string]$DataDir     = "C:\ProgramData\SmartMonitor"
+	)
+
+	# Ensure NSSM is installed
+	if (-not (Get-Command nssm.exe -ErrorAction SilentlyContinue)) {
+    	Write-Error "NSSM not found. Install with: choco install nssm -y"
+    	exit 1
+	}
+
+	# Ensure data/log directories
+	$LogDir = Join-Path $DataDir "logs"
+	New-Item -Force -ItemType Directory $DataDir | Out-Null
+	New-Item -Force -ItemType Directory $LogDir  | Out-Null
+
+	# Install service
+	nssm install $ServiceName $PythonExe $AppPath
+	nssm set $ServiceName AppDirectory $AppDir
+
+	# Environment variables for the service
+	$envblock = @"
+	SMARTMONITOR_DB_PATH=$DataDir\smart_factory_monitor.db
+	LOG_LEVEL=INFO
+	PYTHONUNBUFFERED=1
+	"@
+	nssm set $ServiceName AppEnvironmentExtra $envblock
+
+	# Log rotation
+	nssm set $ServiceName AppStdout "$LogDir\smartmonitor.out.log"
+	nssm set $ServiceName AppStderr "$LogDir\smartmonitor.err.log"
+	nssm set $ServiceName AppRotateFiles 1
+	nssm set $ServiceName AppRotateOnline 1
+	nssm set $ServiceName AppRotateBytes 10485760   # 10 MB
+
+	# Recovery: auto-restart on exit/crash
+	nssm set $ServiceName AppExit Default Restart
+
+	# Run as LocalSystem (full service privileges)
+	nssm set $ServiceName ObjectName LocalSystem
+
+	# Start the service
+	nssm start $ServiceName
+
+	Write-Host "[OK] Service $ServiceName installed and started"
+	Write-Host "Logs: $LogDir\smartmonitor.out.log / smartmonitor.err.log"
+
+
+  3.Run it (Administrator PowerShell)
+
+	cd C:\path\to\scripts
+	.\install_service.ps1
+
+  4.Manage the service
+
+	Start:
+
+		nssm start SmartMonitor
+
+
+	Stop:
+
+		nssm stop SmartMonitor
+
+
+	Check status:
+
+		sc query SmartMonitor
+
+
+	Tail logs:
+
+		Get-Content -Wait C:\ProgramData\SmartMonitor\logs\smartmonitor.out.log
+
+
+
+
+
+Uninstall 
+
+   uninstall_service.ps1
+
+
+     <#
+.SYNOPSIS
+  Uninstall the Smart-Monitor Windows service (NSSM) and optionally clean data/logs/env.
+
+.PARAMETER ServiceName
+  Name of the NSSM service (default: SmartMonitor)
+
+.PARAMETER RemoveData
+  Also delete C:\ProgramData\SmartMonitor\smart_factory_monitor.db and the data folder.
+
+.PARAMETER RemoveLogs
+  Also delete C:\ProgramData\SmartMonitor\logs\*.
+
+.PARAMETER RemoveSystemEnv
+  Remove system-wide env vars set for dev (SMARTMONITOR_DB_PATH, LOG_LEVEL, PYTHONUNBUFFERED).
+
+.EXAMPLE
+  .\uninstall_service.ps1
+.EXAMPLE
+  .\uninstall_service.ps1 -ServiceName MySmartMon -RemoveData -RemoveLogs -RemoveSystemEnv
+#>
+
+[CmdletBinding(SupportsShouldProcess)]
+param(
+  [string] $ServiceName     = "SmartMonitor",
+  [switch] $RemoveData,
+  [switch] $RemoveLogs,
+  [switch] $RemoveSystemEnv
+)
+
+function Stop-Service-IfRunning {
+  param([string]$Name)
+  $s = sc.exe query $Name 2>$null
+  if ($LASTEXITCODE -eq 0 -and $s -match "STATE\s+:\s+\d+\s+RUNNING") {
+    Write-Host "[INFO] Stopping service $Name ..."
+    nssm stop $Name 2>$null | Out-Null
+    Start-Sleep -Seconds 2
+  } else {
+    Write-Host "[INFO] Service $Name not running."
+  }
+}
+
+# 1) Ensure NSSM exists; fall back to SC if needed
+$hasNssm = [bool](Get-Command nssm.exe -ErrorAction SilentlyContinue)
+if (-not $hasNssm) {
+  Write-Warning "NSSM not found in PATH. Falling back to 'sc.exe delete' (works if service exists)."
+}
+
+# 2) Stop service if running
+Stop-Service-IfRunning -Name $ServiceName
+
+# 3) Remove the service
+if ($hasNssm) {
+  Write-Host "[INFO] Removing service $ServiceName via NSSM ..."
+  nssm remove $ServiceName confirm 2>$null | Out-Null
+} else {
+  Write-Host "[INFO] Removing service $ServiceName via SC ..."
+  sc.exe delete $ServiceName | Out-Null
+}
+
+# 4) Optional cleanup
+$DataRoot = "C:\ProgramData\SmartMonitor"
+$DbPath   = Join-Path $DataRoot "smart_factory_monitor.db"
+$LogDir   = Join-Path $DataRoot "logs"
+
+if ($RemoveLogs) {
+  if (Test-Path $LogDir) {
+    Write-Host "[INFO] Deleting logs: $LogDir"
+    Remove-Item -Recurse -Force $LogDir
+  } else {
+    Write-Host "[INFO] No logs to delete at $LogDir"
+  }
+}
+
+if ($RemoveData) {
+  if (Test-Path $DbPath) {
+    Write-Host "[INFO] Deleting DB: $DbPath"
+    Remove-Item -Force $DbPath
+  }
+  if (Test-Path $DataRoot) {
+    Write-Host "[INFO] Removing data folder (if empty): $DataRoot"
+    Remove-Item -Force $DataRoot -ErrorAction SilentlyContinue
+  }
+}
+
+if ($RemoveSystemEnv) {
+  Write-Host "[INFO] Removing system environment variables ..."
+  [Environment]::SetEnvironmentVariable("SMARTMONITOR_DB_PATH", $null, "Machine")
+  [Environment]::SetEnvironmentVariable("LOG_LEVEL", $null, "Machine")
+  [Environment]::SetEnvironmentVariable("PYTHONUNBUFFERED", $null, "Machine")
+  Write-Host "[INFO] You may need to restart PowerShell/Explorer for changes to reflect."
+}
+
+Write-Host "[DONE] Uninstall complete."
+
+
+How to run it
+
+Open Administrator PowerShell in the folder containing the script:
+
+Basic uninstall (keep data & logs):
+
+.\uninstall_service.ps1
+
+
+Full cleanup (remove DB, logs, and system env vars you set during dev):
+
+.\uninstall_service.ps1 -RemoveData -RemoveLogs -RemoveSystemEnv
+
+
+Custom service name:
+
+.\uninstall_service.ps1 -ServiceName MySmartMon
+
+
+That’s it. If you also want a matching install script that uses the same ServiceName/DataDir parameters so install/uninstall pair nicely, I can align the earlier install_service.ps1 to the same interface.
+
+
+
+

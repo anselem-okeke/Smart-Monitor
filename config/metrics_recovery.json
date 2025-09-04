@@ -62,7 +62,7 @@
     "consecutive": 2,
     "post_verify_sleep_sec": 10,
     "throttle_minutes": 30,
-    "dry_run": false,
+    "dry_run": true,
 
     "restart_services": ["nginx", "apache2", "gunicorn"],
     "kill_parent_whitelist": ["gunicorn", "celery", "zombie_simulator"]

@@ -100,12 +100,15 @@ def handle_disk():
         "message": after_msg
     })
 
+def handle_disk_recovery():
+    handle_disk()
+    print("[INFO] Disk-recovery loop succeeded …")
+
 if __name__ == "__main__":
     print("[INFO] Disk-recovery loop running …")
     try:
         while True:
-            handle_disk()
-            print("[INFO] Disk-recovery loop succeeded …")
+            handle_disk_recovery()
             time.sleep(300)          # every 5 min
     except KeyboardInterrupt:
         print("[INFO] Disk-recovery stopped")

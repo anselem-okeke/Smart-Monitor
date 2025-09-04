@@ -283,18 +283,22 @@ def handle_zombies():
             "source": "zombie",
             "message": f"zombies persist {zombies2}/{total2} ({ratio2:.3f}); action={action}"})
 
+def handle_metric_recovery():
+    handle_cpu()
+    print(f"[INFO] Metrics-recovery (CPU) loop succeeded...")
+    handle_memory()
+    print(f"[INFO] Metrics-recovery (MEM) loop succeeded...")
+    handle_load()
+    print(f"[INFO] Metrics-recovery (LOAD) loop succeeded...")
+    handle_zombies()
+    print(f"[INFO] Metrics-recovery (ZOMBIES) loop succeeded...")
+
+
 if __name__ == '__main__':
     print(f"[INFO] Metrics-recovery (CPU/MEM) loop running...")
     try:
         while True:
-            handle_cpu()
-            print(f"[INFO] Metrics-recovery (CPU) loop succeeded...")
-            handle_memory()
-            print(f"[INFO] Metrics-recovery (MEM) loop succeeded...")
-            handle_load()
-            print(f"[INFO] Metrics-recovery (LOAD) loop succeeded...")
-            handle_zombies()
-            print(f"[INFO] Metrics-recovery (ZOMBIES) loop succeeded...")
+            handle_metric_recovery()
             time.sleep(60)  # run every minute
     except KeyboardInterrupt:
         print("[INFO] Metrics-recovery stopped by user")

@@ -1,7 +1,6 @@
 import os, sys
 import platform
 import socket
-import subprocess
 import time
 from datetime import datetime
 
@@ -145,22 +144,25 @@ def handle_event(ev):
         net_log("warning", msg)
         return
 
+def handle_network_recovery():
+    failed_events = recent_failed_network_events(hostname)
+
+    if not failed_events:
+        print("[INFO] No failed network events at this time.")
+    else:
+        print(f"[INFO] Found {len(failed_events)} failed event(s)")
+
+    for event in failed_events:
+        handle_event(event)
+        print(f"[INFO] Network event handling succeeded")
+
 
 if __name__ == '__main__':
     print("[INFO] Network-recovery loop running...")
 
     try:
         while True:
-            failed_events = recent_failed_network_events(hostname)
-
-            if not failed_events:
-                print("[INFO] No failed network events at this time.")
-            else:
-                print(f"[INFO] Found {len(failed_events)} failed event(s)")
-
-            for event in failed_events:
-                handle_event(event)
-                print(f"[INFO] Network event handling succeeded")
+            handle_network_recovery()
 
             # Wait before next check
             time.sleep(60)
