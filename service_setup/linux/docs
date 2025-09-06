@@ -1,0 +1,183 @@
+Why run the orchestrator as a service (Production)
+    -Auto-start on boot: no one has to SSH in and start it.
+    -Supervision & auto-restart: if your process crashes, the service manager restarts it.
+    -Centralized logs: view with journalctl (Linux) or Event Viewer (Windows).
+    -Security: run under a restricted user, limit filesystem access.
+    -Config separation: keep runtime options (DB path, DRY_RUN) outside code.
+    -Single command ops: start/stop/status become predictable.
+
+Linux (systemd) — step-by-step (with “why”)
+    -Assuming your repo(code) lives at /opt/smart-monitor and your entrypoint is /opt/smart-monitor/main.py.
+
+1) Create a dedicated user (why: least privilege)
+    sudo useradd --system --home /nonexistent --shell /usr/sbin/nologin smartmonitor || true
+    or
+    sudo useradd -r -s /usr/sbin/nologin smartmonitor || true
+    sudo install -d -m 0770 -o smartmonitor -g smartmonitor /var/lib/smart-monitor
+    sudo usermod -aG smartmonitor vagrant   # let your shell user access the DB
+
+    If issues arises, give smartmonitor user broad sudo rights (not least-privilege, but fast).
+
+        -Open sudoers safely
+            sudo visudo
+
+        -Add this line at the end
+            smartmonitor ALL=(ALL) NOPASSWD:ALL
+
+        -Save & exit
+            Visudo will validate the syntax.
+
+2) (Optional) Create a Python venv (why: stable deps)
+    cd /opt/smart-monitor
+    python3 -m venv .venv
+    sudo /opt/smart-monitor/.venv/bin/pip install --upgrade pip
+    sudo /opt/smart-monitor/.venv/bin/pip install -r requirements.txt
+
+If you don’t use a venv, point ExecStart to /usr/bin/python3 later.
+
+3) Prepare runtime directories (why: write permissions only where needed)
+    sudo mkdir -p /var/lib/smart-monitor         # DB/state lives here
+    sudo chown smartmonitor:smartmonitor /var/lib/smart-monitor
+
+4) Create an environment file (why: config without code edits)
+    sudo mkdir -p /etc/smart-monitor
+    sudo tee /etc/smart-monitor/env >/dev/null <<'EOF'
+    DRY_RUN=true
+    SMARTMONITOR_DB_PATH=/var/lib/smart-monitor/smart_factory_monitor.db
+    PYTHONUNBUFFERED=1
+    LOG_LEVEL=INFO
+    EOF
+
+5) Create the systemd unit (why: supervision + lifecycle)
+    /etc/systemd/system/smart-monitor.service
+
+    [Unit]
+    Description=Smart-Monitor Orchestrator
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    Type=simple
+    # Use your venv Python (or /usr/bin/python3 if no venv)
+    ExecStart=/opt/smart-monitor/.venv/bin/python /opt/smart-monitor/main.py
+    WorkingDirectory=/opt/smart-monitor
+    EnvironmentFile=-/etc/smart-monitor/env
+    User=smartmonitor
+    Group=smartmonitor
+    Restart=always
+    RestartSec=5
+
+    # (add hardening later after we confirm it runs)
+
+    [Install]
+    WantedBy=multi-user.target
+
+6) Start + enable (why: activate now and on boot)
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now smart-monitor
+
+7) Verify & tail logs (why: confirm continuous operation)
+    systemctl status smart-monitor --no-pager
+    journalctl -u smart-monitor -f
+
+    You should see orchestrator’s logs (with scheduling ticks and handler outputs).
+
+8) Harden once it’s stable (why: defense-in-depth)
+    Append to the [Service] section:
+
+    NoNewPrivileges=true
+    PrivateTmp=true
+    ProtectSystem=full
+    ProtectHome=true
+    ReadWritePaths=/var/lib/smart-monitor
+    MemoryDenyWriteExecute=true
+    RestrictRealtime=true
+    RestrictSUIDSGID=true
+
+
+    Then:
+    sudo systemctl daemon-reload
+    sudo systemctl restart smart-monitor
+
+
+9) Troubleshooting quick hits
+    Permission denied on DB → sudo chown -R smartmonitor:smartmonitor /var/lib/smart-monitor
+    Module not found → ensure installed in the venv used by ExecStart
+    No logs → PYTHONUNBUFFERED=1 in env (already set), make sure your logger prints to stdout/stderr
+    Path issues → confirm WorkingDirectory and that main.py imports work from project root
+
+
+
+Enable dev environment to use env vars (Optional if no db default path)
+     1) Make it permanent for the shell (optional), Append to your ~/.bashrc
+         sudo mkdir -p /var/lib/smart-monitor
+         echo 'export SMARTMONITOR_DB_PATH=/var/lib/smart-monitor/smart_factory_monitor.db' >> ~/.bashrc
+         echo 'export LOG_LEVEL=INFO' >> ~/.bashrc
+         source ~/.bashrc
+
+     2) Fix the login profile
+        Make sure the login shell exports everything from /etc/smart-monitor/env
+
+        #!/bin/bash
+        sudo tee /usr/local/bin/run-smartmon >/dev/null <<'SH'
+        #!/usr/bin/env bash
+        set -e
+        # Export service env for any shell (login or not)
+        set -a
+        [ -r /etc/smart-monitor/env ] && . /etc/smart-monitor/env
+        set +a
+        exec python3 /vagrant/Smart-Monitor/main.py "$@"
+        SH
+        sudo chmod 755 /usr/local/bin/run-smartmon
+
+
+     3) Now dev run is simply
+        sudo systemctl stop smart-monitor
+        sudo -u smartmonitor run-smartmon
+
+
+SQLite Web interface in the VM
+https://github.com/coleifer/sqlite-web?utm_source=chatgpt.com
+    sudo docker rm -f $(sudo docker ps -q --filter ancestor=ghcr.io/coleifer/sqlite-web:latest) 2>/dev/null || true
+
+    sudo docker run -d --rm \
+      -p 9080:8080 \
+      -v /var/lib/smart-monitor:/data:Z,ro \
+      -e SQLITE_DATABASE=smart_factory_monitor.db \
+      ghcr.io/coleifer/sqlite-web:latest
+
+      Z:option allows the content to be shared among multiple containers
+      ro:option read only
+
+    # Verify (note the ports -> 0.0.0.0:9080->8080/tcp)
+    container-> 8080
+    vm-> 9080 -> guest on vm
+    hostmachine-> 9090 or 9080 host on vm depending on the port you chose
+    so the 8080->9080->9090 or 9080
+
+    sudo docker ps -a
+
+    to see what's using 8080
+    sudo ss -lntp | grep ':8080' || echo "8080 is free"
+
+    port forwarding
+    In VirtualBox → VM → Settings → Network → Advanced → Port Forwarding.
+    container is running and mapped as host(guest)=9080 → container=8080:
+    0.0.0.0:9080->8080/tcp zen_morse
+
+        Add a new rule:
+        Name: sqlite-web
+        Protocol: TCP
+        Host IP: 127.0.0.1 access only on local host or (leave blank) access to all IPs
+        Host Port: 9080 or any other port(eg, 9090)
+        Guest IP: (leave blank)
+        Guest Port: 9080
+
+        test
+        curl -s http://127.0.0.1:9080/ | head
+
+        Use Bridged Adapter (make VM a peer on LAN)-firewalld must allow forwarded port in the VM
+        sudo firewall-cmd --add-port=9080/tcp --permanent
+        sudo firewall-cmd --reload
+        then on window, ipconfig to get Wireless LAN adapter Wi-Fi eg http://192.168.0.76:9080/ or localhost http://localhost:9080/ or hostonly http://192.168.56.12:9080/
+
