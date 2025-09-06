@@ -1,0 +1,204 @@
+SQLITEWEB AND NGROK AS SERVICE IN DOCKER COMPOSE
+
+version "3.8"
+
+services:
+    sqliteweb:
+        image: ghcr.io/coleifer/sqlite-web:latest
+        container_name: sqliteweb
+        restart: unless-stopped
+        ports:
+            - "9090:8080" #guest vm port:container_port
+        environment:
+            SQLITE_DATABASE: smart_factory_monitor.db
+        volumes:
+            - /var/lib/smart-monitor:/data:Z,ro #mount DB folder as read-only
+
+    ngrok:
+        image: ngrok/ngrok:latest
+        container_name: ngrok-sqliteweb
+        restart: unless-stopped
+        depends_on:
+            - sqliteweb
+        environment:
+            # paste ngrok token here
+            NGROK_AUTHTOKEN: "YOUR_NGROK_TOKEN"
+            # expose the sqliteweb services
+            NGROK_ADDR: "sqliteweb:8080"
+            # optional basic-auth for safety
+            NGROK_BASIC_AUTH: "sql:sql123"
+        command: http
+
+
+Steps to use:
+    1.Get an ngrok token from the ngrok dashboard
+        From https://dashboard.ngrok.com/get-started/your-authtoken
+        Replace "YOUR_NGROK_TOKEN" in the YAML.
+
+    2.Run both services:
+        cd /path/to/docker-compose.yml
+        sudo docker compose up -d
+
+    3.Check ngrok logs:
+        sudo docker logs ngrok-sqliteweb
+        You’ll see something like:
+            Forwarding  https://abcd-1234.eu.ngrok.io -> http://sqliteweb:8080
+
+    4.Access it:
+        Public URL from ngrok logs: https://abcd-1234.eu.ngrok.io
+        Protected with user/pass: sql / sql123
+        DB is mounted read-only, so browsing only.
+
+    5.Security notes
+        Anyone with the ngrok URL + credentials can view the DB, but cannot modify it (:ro mount).
+        If you want to shut it down:
+            sudo docker compose down
+
+
+
+
+
+ngrok token (and other config) isn’t hardcoded in the docker-compose.yml.
+
+version "2"
+
+authtoken: YOUR_NGROK_TOKEN
+tunnels:
+    sqliteweb:
+        proto: http
+        addr: sqliteweb:8080
+        basic_auth: demo:demo123 # optional, remove if you dont want login
+
+
+version "3.8"
+
+services:
+    sqliteweb:
+        image: ghcr.io/coleifer/sqlite-web:latest
+        container_name: sqliteweb
+        restart: unless-stopped
+        ports:
+            - "9090:8080" #guest vm port:container_port
+        environment:
+            SQLITE_DATABASE: smart_factory_monitor.db
+        volumes:
+            - /var/lib/smart-monitor:/data:Z,ro       # mount DB folder as read-only
+            - sqliteweb_logs:/var/log/sqliteweb       # persist logs here
+        command:  sh -c "mkdir -p /var/log/sqliteweb && sqlite_web /data/${SQLITE_DATABASE} > /var/log/sqliteweb/access.log 2>&1"
+
+    ngrok:
+        image: ngrok/ngrok:latest
+        container_name: ngrok-sqliteweb
+        restart: unless-stopped
+        depends_on:
+            - sqliteweb
+        command: ["start", "--all", "--config", "/etc/ngrok/ngrok.yml"]
+        volumes:
+            - ./ngrok/ngrok.yml:/etc/ngrok/ngrok.yml:ro
+volumes:
+    sqliteweb_logs:  # named volume for sqliteweb logs
+
+
+1.Start services
+    cd ~/path-to-docker-compase
+    sudo docker compose up -d
+
+2.Get the ngrok URL
+    sudo docker logs ngrok-sqliteweb
+    You’ll see something like:
+        Forwarding  https://abc12345.ngrok.io -> http://sqliteweb:8080
+
+3.Benefits
+    No secret tokens in docker-compose.yml (they stay in ngrok.yml).
+    Easy to add more tunnels later (just extend ngrok.yml).
+    Everything portable — move the project folder, and both sqlite-web + ngrok come up together.
+
+
+
+Docker volume for sqlite-web logs->Explanation1
+    1.Where sqlite-web logs go
+        sqlite-web itself just writes to stdout, which Docker captures as logs.
+        But we can redirect those logs into a mounted directory, so they’re preserved across restarts.
+
+    2.How it works
+        The command override makes sqlite-web write its logs to /var/log/sqliteweb/access.log.
+        That folder is mounted on a named Docker volume called sqliteweb_logs.
+        Logs survive container restarts/recreation.
+
+    3.Checking the logs
+        # view logs (from the volume)
+        sudo docker run --rm -it -v sqliteweb_logs:/logs alpine cat /logs/access.log
+
+        # or attach a shell
+        sudo docker run --rm -it -v sqliteweb_logs:/logs alpine sh
+        cat /logs/access.log
+
+    4.Now you’ve got:
+        sqlite-web (read-only DB browser)
+        ngrok tunnel (with config in ngrok.yml)
+        persistent sqlite-web access logs
+
+
+Docker volume for sqlite-web logs->Explanation1
+1.In docker-compose.yml
+    volumes:
+      - sqliteweb_logs:/var/log/sqliteweb
+
+2.overrode the command to make sqlite-web write into:
+    /var/log/sqliteweb/access.log
+
+3.So inside the sqlite-web container the file lives at:
+    /var/log/sqliteweb/access.log
+
+4.Named volumes
+    sqliteweb_logs is a Docker named volume.
+    Docker mounts that volume at /var/log/sqliteweb inside the sqlite-web container.
+    Whatever sqlite-web writes there, gets stored in the volume.
+
+5.Inspecting the volume from outside
+    When you run:
+        sudo docker run --rm -it -v sqliteweb_logs:/logs alpine cat /logs/access.log
+        start a throwaway Alpine container.
+        mount the same named volume (sqliteweb_logs) into that container at path /logs.
+        Since sqlite-web wrote access.log inside /var/log/sqliteweb, and that is the root of the volume, in Alpine it appears as /logs/access.log.
+
+    So:
+    /var/log/sqliteweb/access.log in sqlite-web <-> /logs/access.log in Alpine
+    (both point to the same underlying named volume).
+
+5.Why it looks different
+    Path inside sqlite-web: /var/log/sqliteweb/access.log
+    Path mounted into Alpine: /logs/access.log
+
+6.Different mount points, but it’s the same file in the same Docker volume.
+    The cat /logs/access.log works because the mounted volume at /logs in Alpine.
+    It’s just a convenient way to peek into the volume from outside the sqlite-web container.
+
+7.Why Alpine?
+    Alpine is a super-small Linux image (5 MB).
+    It has basic tools: sh, cat, ls.
+    used as a utility container: start it, mount a volume, peek inside, exit.
+    Because it’s so small, it’s fast to pull and run.
+    That’s why Alpine is often seen in examples for debugging.
+
+8.Could you use another container?
+    Absolutely any container can mount the volume.
+    Examples:
+        Ubuntu:
+            docker run --rm -it -v sqliteweb_logs:/logs ubuntu bash
+            (Ubuntu has /bin/bash, but heavier image).
+        Debian:
+            docker run --rm -it -v sqliteweb_logs:/logs debian sh
+        Even BusyBox directly (smaller than Alpine):
+            docker run --rm -it -v sqliteweb_logs:/logs busybox sh
+
+9.How to know which shell a container has?
+    Check the image docs on Docker Hub (they usually specify).
+    Or just try:
+    docker run --rm -it <image> sh
+    If sh isn’t there, try bash.
+        To be safe, you can also override the entrypoint:
+            docker run --rm -it --entrypoint sh <image>
+
+
+i also noticed that in the docker file we used entrypoint.sh, not cmd. what are the different how is it used, clear any confusion in using both

@@ -1,0 +1,31 @@
+version "3.8"
+
+services:
+    sqliteweb:
+        image: ghcr.io/coleifer/sqlite-web:latest
+        container_name: sqliteweb
+        restart: unless-stopped
+        ports:
+            - "9090:8080" #guest vm port:container_port
+        environment:
+            SQLITE_DATABASE: smart_factory_monitor.db
+        volumes:
+            - /var/lib/smart-monitor:/data:Z,ro #mount DB folder as read-only
+
+    ngrok:
+        image: ngrok/ngrok:latest
+        container_name: ngrok-sqliteweb
+        restart: unless-stopped
+        depends_on:
+            - sqliteweb
+        environment:
+            # paste ngrok token here
+            NGROK_AUTHTOKEN: "NGROK_AUTHTOKEN"
+            # expose the sqliteweb services
+            NGROK_ADDR: "sqliteweb:8080"
+            # optional basic-auth for safety
+            NGROK_BASIC_AUTH: "sql:sql123"
+        command: http
+
+
+

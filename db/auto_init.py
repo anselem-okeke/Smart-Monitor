@@ -18,7 +18,6 @@ REQUIRED_TABLES = [
 def default_db_path():
     # repo fallback: Smart-Monitor/db/smart_factory_monitor.db
     return str(Path(__file__).resolve().parent / "smart_factory_monitor.db")
-print(default_db_path())
 
 def schema_path():
     return Path(__file__).resolve().parent / "schema.sql"

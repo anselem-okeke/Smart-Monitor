@@ -1,0 +1,48 @@
+What ngrok actually does:
+Think of ngrok as a reverse proxy as a service.
+    -It runs a small client (containers) that connects out to ngrok’s cloud.
+    -ngrok then gives a public URL (https://xyz.ngrok.io) that tunnels traffic back into the local app.
+
+So you don’t need:
+    -to open firewall ports
+    -to configure ISP router
+    -to buy a public IP
+
+ngrok free plan offers:
+    -Public HTTPS URL → great for demoing services (like sqlite-web, Grafana, Prometheus).
+    -Temporary subdomain (random-string.ngrok.io).
+    -Basic web UI (http://127.0.0.1:4040) to inspect traffic.
+    -Up to 1 tunnel, 1 ngrok process.
+
+Install ngrok
+On Windows host (since smart-monitor.service is exposed on localhost:9080):
+    -Download from https://ngrok.com/download
+    -Unzip, place ngrok.exe somewhere in sys PATH (e.g. C:\Windows\System32 or C:\Users\<you>\AppData\Local\Microsoft\WindowsApps\).
+    -Or use Chocolatey:
+        choco install ngrok -y
+    -Note:
+        For the most secure experience, use the Microsoft Store to install ngrok. This type of installation is fully
+        supported by Windows, ensuring automatic updates and compatibility with app management tools.
+
+Authenticate (one-time)
+Create an ngrok account (free). Copy authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
+    -Then run on powershell or cmd:
+        -ngrok config add-authtoken <YOUR_AUTHTOKEN>
+
+Start a tunnel to sqlite-web
+    -Since sqlite-web is already reachable on the Windows host at http://127.0.0.1:9080:
+        -ngrok http 9080
+
+Copy the public URL
+    -ngrok will output something like:
+    -Forwarding  https://abcd-1234.eu.ngrok.io -> http://localhost:9080
+    -Open the https://...ngrok.io URL in a browser or share it anyone with the link can reach your sqlite-web UI.
+
+Security warning:
+    -sqlite-web has no login by default, so anyone with the URL can browse/modify the DB.
+
+If a need to share safely, use:
+    -ngrok http --basic-auth user:pass 9080
+    -this prompts for a username/password
+    -but thi does not guarantee that the user cannot modify db
+    -thats the reason db path was mounted in the container with option :ro

@@ -1,0 +1,30 @@
+version "3.8"
+
+services:
+    sqliteweb:
+        image: ghcr.io/coleifer/sqlite-web:latest
+        container_name: sqliteweb
+        restart: unless-stopped
+        ports:
+            - "${HOST_PORT}:8080" #guest vm port:container_port
+        environment:
+            SQLITE_DATABASE: "${DB_FILE}"
+        volumes:
+            - /var/lib/smart-monitor:/data:Z,ro       # mount DB folder as read-only
+            - ${DB_FOLDER}:/var/log/sqliteweb       # persist logs here
+        command:  sh -c "mkdir -p /var/log/sqliteweb && sqlite_web /data/${SQLITE_DATABASE} > /var/log/sqliteweb/access.log 2>&1"
+
+    ngrok:
+        image: ngrok/ngrok:latest
+        container_name: ngrok-sqliteweb
+        restart: unless-stopped
+        depends_on:
+            - sqliteweb
+        command: ["start", "--all", "--config", "/etc/ngrok/ngrok.yml"]
+        volumes:
+            - ./ngrok/ngrok.yml:/etc/ngrok/ngrok.yml:ro
+volumes:
+    sqliteweb_logs:  # named volume for sqliteweb logs
+
+
+
