@@ -1,3 +1,4 @@
+# multi-architecture dockerfile
 FROM python:3.12-alpine AS base
 
 # deps for sqlite-web
