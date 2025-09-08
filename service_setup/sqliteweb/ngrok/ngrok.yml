@@ -1,8 +1,17 @@
-version "2"
+# v3 config
+version: "3"
 
-authtoken: YOUR_NGROK_TOKEN
-tunnels:
-    sqliteweb:
-        proto: http
-        addr: sqliteweb:8080
-        basic_auth: demo:demo123 # optional, remove if you dont want login
+# keep secrets via env var; empty block is fine
+agent: {}
+
+endpoints:
+  - name: sqliteweb
+    upstream:
+      url: http://sqliteweb:8080
+    traffic_policy:
+      on_http_request:
+        - actions:
+            - type: basic-auth
+              config:
+                credentials:
+                  - "demo:Demo@12345"

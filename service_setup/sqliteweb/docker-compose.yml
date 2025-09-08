@@ -1,4 +1,4 @@
-version "3.8"
+version: "3.8"
 
 services:
     sqliteweb:
@@ -10,9 +10,12 @@ services:
         environment:
             SQLITE_DATABASE: "${DB_FILE}"
         volumes:
-            - /var/lib/smart-monitor:/data:Z,ro       # mount DB folder as read-only
-            - ${DB_FOLDER}:/var/log/sqliteweb       # persist logs here
-        command:  sh -c "mkdir -p /var/log/sqliteweb && sqlite_web /data/${SQLITE_DATABASE} > /var/log/sqliteweb/access.log 2>&1"
+            - ${DB_FOLDER:?DB_FOLDER not set}:/data:Z,ro # mount DB folder as read-only, and any persion issues ad :Z,ro to bind mount
+            - ${LOG_FOLDER:?LOG_FOLDER not set}:/var/log/sqliteweb # persist logs here, :?… makes Compose fail fast if typo in var
+        command: >
+         sh -c "mkdir -p /var/log/sqliteweb &&
+         sqlite_web -H 0.0.0.0 -p 8080 --read-only /data/$${SQLITE_DATABASE}
+         > /var/log/sqliteweb/access.log 2>&1"
 
     ngrok:
         image: ngrok/ngrok:latest
@@ -20,6 +23,10 @@ services:
         restart: unless-stopped
         depends_on:
             - sqliteweb
+        environment:
+            NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+        ports:
+            - "4040:4040"
         command: ["start", "--all", "--config", "/etc/ngrok/ngrok.yml"]
         volumes:
             - ./ngrok/ngrok.yml:/etc/ngrok/ngrok.yml:ro

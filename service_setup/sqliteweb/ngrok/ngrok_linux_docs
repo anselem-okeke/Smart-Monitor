@@ -60,15 +60,23 @@ Steps to use:
 
 ngrok token (and other config) isn’t hardcoded in the docker-compose.yml.
 
-version "2"
+# v3 config
+version: "3"
 
-authtoken: YOUR_NGROK_TOKEN
-tunnels:
-    sqliteweb:
-        proto: http
-        addr: sqliteweb:8080
-        basic_auth: demo:demo123 # optional, remove if you dont want login
+# keep secrets via env var; empty block is fine
+agent: {}
 
+endpoints:
+  - name: sqliteweb
+    upstream:
+      url: http://sqliteweb:8080
+    traffic_policy:
+      on_http_request:
+        - actions:
+            - type: basic-auth
+              config:
+                credentials:
+                  - "demo:Demo@12345"
 
 version "3.8"
 
@@ -82,9 +90,12 @@ services:
         environment:
             SQLITE_DATABASE: smart_factory_monitor.db
         volumes:
-            - /var/lib/smart-monitor:/data:Z,ro       # mount DB folder as read-only
-            - sqliteweb_logs:/var/log/sqliteweb       # persist logs here
-        command:  sh -c "mkdir -p /var/log/sqliteweb && sqlite_web /data/${SQLITE_DATABASE} > /var/log/sqliteweb/access.log 2>&1"
+            - ${DB_FOLDER:?DB_FOLDER not set}:/data:Z,ro # mount DB folder as read-only, and any persion issues ad :Z,ro to bind mount
+            - ${LOG_FOLDER:?LOG_FOLDER not set}:/var/log/sqliteweb # persist logs here, :?… makes Compose fail fast if typo in var
+        command: >
+         sh -c "mkdir -p /var/log/sqliteweb &&
+         sqlite_web -H 0.0.0.0 -p 8080 --read-only /data/$${SQLITE_DATABASE}  # in command reference is ${SQLITE_DATABASE}. Docker Compose will try to substitute that at parse time (from host/.env), not from the container env set under environment. To use the container’s env var at runtime, escape it as $${SQLITE_DATABASE}.
+         > /var/log/sqliteweb/access.log 2>&1"
 
     ngrok:
         image: ngrok/ngrok:latest
@@ -92,6 +103,8 @@ services:
         restart: unless-stopped
         depends_on:
             - sqliteweb
+        environment:
+            NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
         command: ["start", "--all", "--config", "/etc/ngrok/ngrok.yml"]
         volumes:
             - ./ngrok/ngrok.yml:/etc/ngrok/ngrok.yml:ro
@@ -104,7 +117,8 @@ volumes:
     sudo docker compose up -d
 
 2.Get the ngrok URL
-    sudo docker logs ngrok-sqliteweb
+    curl -s http://127.0.0.1:4040/api/tunnels | \
+        grep -oE '"public_url":"https://[^"]+' | cut -d'"' -f4
     You’ll see something like:
         Forwarding  https://abc12345.ngrok.io -> http://sqliteweb:8080
 
@@ -199,6 +213,3 @@ Docker volume for sqlite-web logs->Explanation1
     If sh isn’t there, try bash.
         To be safe, you can also override the entrypoint:
             docker run --rm -it --entrypoint sh <image>
-
-
-i also noticed that in the docker file we used entrypoint.sh, not cmd. what are the different how is it used, clear any confusion in using both
