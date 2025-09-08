@@ -94,58 +94,136 @@
 
         Entrypoint.sh
 
-            #!/bin/bash
-            set -e
+            #!/usr/bin/env bash
+            set -Eeuo pipefail
 
-            # Start sqlite-web (read-only if volume is :ro)
-            sqlite_web "/data/${SQLITE_DATABASE}" --host 0.0.0.0 --port "${PORT}" > /var/log/smartmon/sqliteweb.log 2>&1 &
+            # --- defaults ---
+            : "${PORT:=8080}"
+            : "${SQLITE_DATABASE:=smart_factory_monitor.db}"
+            : "${NGROK_ADDR:=127.0.0.1:8080}"          # can be host:port or full http(s):// URL
+            : "${NGROK_AUTHTOKEN:=}"                   # pass at docker run time
+            : "${NGROK_BASIC_AUTH:=}"                  # comma-separated "user:pass,user2:pass2"
 
-            # Prepare ngrok config on the fly (or mount your own at /etc/ngrok/ngrok.yml)
-            if [ -n "${NGROK_AUTHTOKEN}" ]; then
-              cat > /etc/ngrok/ngrok.yml <<EOF
-            version: "2"
-            authtoken: ${NGROK_AUTHTOKEN}
-            tunnels:
-              sqliteweb:
-                proto: http
-                addr: ${NGROK_ADDR}
-            EOF
-              if [ -n "${NGROK_BASIC_AUTH}" ]; then
-                printf "    basic_auth: %s\n" "${NGROK_BASIC_AUTH}" >> /etc/ngrok/ngrok.yml
-              fi
-              ngrok start --all --config /etc/ngrok/ngrok.yml > /var/log/smartmon/ngrok.log 2>&1 &
+            mkdir -p /var/log/smartmon
+            DB="/data/${SQLITE_DATABASE}"
+
+            # Validate DB is readable
+            if [[ ! -r "$DB" ]]; then
+              echo "[ERROR] DB not readable at: $DB" >&2
+              ls -l /data || true
+              exit 1
             fi
 
-            # Tail both logs to stdout
-            exec tail -F /var/log/smartmon/sqliteweb.log /var/log/smartmon/ngrok.log
+            # Normalize upstream to a full URL for ngrok v3
+            if [[ "$NGROK_ADDR" =~ ^https?:// ]]; then
+              UPSTREAM="$NGROK_ADDR"
+            else
+              UPSTREAM="http://$NGROK_ADDR"
+            fi
+
+            # Start sqlite-web (read-only UI)
+            sqlite_web --read-only --host 0.0.0.0 --port "$PORT" "$DB" \
+              > /var/log/smartmon/sqliteweb.log 2>&1 &
+            SQLITE_PID=$!
+
+            # Build ngrok v3 config if we have a token (the agent also accepts NGROK_AUTHTOKEN from env)
+            NGROK_LOG="/var/log/smartmon/ngrok.log"
+            : > "$NGROK_LOG"
+
+            if [[ -n "$NGROK_AUTHTOKEN" ]]; then
+              {
+                echo 'version: "3"'
+                echo 'endpoints:'
+                echo '  - name: sqliteweb'
+                echo '    upstream:'
+                echo "      url: \"$UPSTREAM\""
+                # optional Basic Auth via traffic policy
+                if [[ -n "$NGROK_BASIC_AUTH" ]]; then
+                  echo '    traffic_policy:'
+                  echo '      on_http_request:'
+                  echo '        - actions:'
+                  echo '            - type: basic-auth'
+                  echo '              config:'
+                  echo '                credentials:'
+                  IFS=',' read -ra CREDS <<< "$NGROK_BASIC_AUTH"
+                  for c in "${CREDS[@]}"; do
+                    echo "                  - \"${c}\""
+                  done
+                fi
+              } > /etc/ngrok/ngrok.yml
+
+              # Start v3 agent: reads NGROK_AUTHTOKEN from env; config defines the endpoint
+              ngrok start --all --config /etc/ngrok/ngrok.yml > "$NGROK_LOG" 2>&1 &
+              NGROK_PID=$!
+            else
+              NGROK_PID=""
+            fi
+
+            # Graceful shutdown
+            trap '[[ -n "${NGROK_PID}" ]] && kill "$NGROK_PID" 2>/dev/null || true; kill "$SQLITE_PID" 2>/dev/null || true' INT TERM
+
+            # Stream logs
+            tail -F /var/log/smartmon/sqliteweb.log "$NGROK_LOG" &
+            TAIL_PID=$!
+
+            # Wait on children
+            wait -n "$SQLITE_PID" ${NGROK_PID:+$NGROK_PID} "$TAIL_PID"
 
 
         Make it executable:
             chmod +x entrypoint.sh
 
 
-        Build & push multi-arch (so it runs on Intel/AMD and ARM):
-            # one-time
-            docker buildx create --use
+        Build & push multi-arch-> docker-build-image.sh (so it runs on Intel/AMD and ARM):
+        #!/usr/bin/env bash
 
-            # login
-            docker login
+        set -Eeuo pipefail
 
-            # build & push (adjust yourhub/yourimage)
-            docker buildx build --platform linux/amd64,linux/arm64 \
-              -t yourhub/smartmon-sqliteweb:latest \
-              --push .
+        # Optional: load a local .env if present (so DOCKER_HUB_NAME/DOCKER_HUB_TOKEN work)
+        # absolute path to this script's directory (works even if called via symlink)
+        SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+        ENV_FILE="${ENV_FILE:-$(realpath "$SCRIPT_DIR/../../.env")}"
+
+        echo "$SCRIPT_DIR"
+        echo "$ENV_FILE"
+
+        if [[ -f "$ENV_FILE" ]]; then
+          set -a
+          # shellcheck disable=SC1090
+          source <(sed -e 's/\r$//' "$ENV_FILE")
+          set +a
+        else
+          echo "Missing .env at: $ENV_FILE" >&2
+          exit 1
+        fi
+
+        # Require these to be set (either exported or in .env)
+        : "${DOCKER_HUB_NAME:?Set DOCKER_HUB_NAME (Docker Hub username)}"
+        : "${DOCKER_HUB_TOKEN:?Set DOCKER_HUB_TOKEN (Docker Hub access token)}"
+
+        # Ensure a buildx builder exists
+        docker buildx inspect >/dev/null 2>&1 || docker buildx create --use
+
+        # Non-interactive login (works in scripts/CI)
+        echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_NAME" --password-stdin
+
+        # Build & push multi-arch
+        docker buildx build --platform linux/amd64,linux/arm64 \
+          -t "$DOCKER_HUB_NAME/smartmon-sqliteweb:latest" \
+          --push .
 
 
         How users run it (any OS):
             # read-only DB mount for safe sharing
-            docker run -d --rm \
+            docker run -d \
               -p 9090:8080 \
-              -v /var/lib/smart-monitor:/data:ro \
+              -p 4040:4040  \
+              -v /var/lib/smart-monitor:/data:Z,ro \  # :Z for Debian/Ubuntu but not :Z for MacOs/CentOs
               -e SQLITE_DATABASE=smart_factory_monitor.db \
               -e NGROK_AUTHTOKEN=xxxxxx \
               -e NGROK_ADDR=localhost:8080 \
               -e NGROK_BASIC_AUTH=demo:demo123 \
+              --user 0:0 \
               yourhub/smartmon-sqliteweb:latest
 
         Local access: http://localhost:9090/

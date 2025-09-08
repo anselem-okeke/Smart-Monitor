@@ -9,3 +9,18 @@ __pycache__/
 *.docx
 *.pdf
 *.db
+
+# env files with secrets
+.env
+.env.local
+.env.*.private
+
+# env template(s) tracked
+!.env.template
+
+# Secrets
+**/.env
+*.env
+.env
+.env.*.local
+**/.env.*
