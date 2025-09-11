@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="G:\DevOps\section8_vprofile_project_manual_automation\vprofile-project\vagrant\Manual_provisioning_WinMacIntel\Smart-Factory-IT-Monitor\venv"
+VIRTUAL_ENV="G:\DevOps\section8_vprofile_project_manual_automation\vprofile-project\vagrant\Manual_provisioning_WinMacIntel\Smart-Monitor\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

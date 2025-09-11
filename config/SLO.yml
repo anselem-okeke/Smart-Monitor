@@ -1,0 +1,201 @@
+
+# Smart-Monitor SLOs & Alerts (Prometheus rules)
+# -----------------------------------------------------------------------------
+# Expected metrics (adapt names if different):
+# 1) API availability (optional if you expose an API handler):
+#    - smart_api_requests_total{status="<HTTP code>", job="smart-monitor"}
+#      (counter; increments per request)
+#
+# 2) Alert delivery latency (SSE push to clients):
+#    - smart_monitor_alert_delivery_seconds_bucket{le="...", job="smart-monitor"}
+#      (histogram; includes +Inf bucket)
+#
+# 3) Auto-recovery outcomes for incidents:
+#    - smart_recovery_incidents_total{outcome="<auto_resolved|manual_resolved|failed>", job="smart-monitor"}
+#      (counter; increments once per incident outcome)
+#
+# 4) Agent heartbeat health (per monitored host/agent):
+#    Option A (preferred): smart_agent_up{agent="<name>", job="smart-monitor"}  ∈ {0,1} (gauge, 1 if heartbeat in last 60s)
+#    Option B: expose smart_agent_last_heartbeat_seconds and set agent_up via recording rule (see commented example below).
+#
+# 5) Disk-full remediation duration:
+#    - smart_recovery_diskfull_duration_seconds_bucket{le="...", job="smart-monitor"}
+#      (histogram; includes +Inf bucket)
+#
+# SLO targets (30d period unless noted):
+# - Alert delivery < 3s  : 99.0%
+# - API availability     : 99.9%
+# - Auto-recovery rate   : 80.0%
+# - Agents up            : 99.5%
+# - Disk-full fix < 120s : 95.0%
+#
+# Burn-rate alerting uses Google's multi-window patterns.
+# Adjust thresholds/windows if your traffic is low.
+# -----------------------------------------------------------------------------
+
+groups:
+- name: smart-monitor-sli-rules
+  rules:
+  # --- API availability (success / total) ---
+  - record: smart_monitor:api_availability:ratio_rate5m
+    expr: |
+      sum by(job) (rate(smart_api_requests_total{job="smart-monitor", status=~"2..|3.."}[5m]))
+      /
+      sum by(job) (rate(smart_api_requests_total{job="smart-monitor"}[5m]))
+
+  - record: smart_monitor:api_availability:ratio_rate1h
+    expr: |
+      sum by(job) (rate(smart_api_requests_total{job="smart-monitor", status=~"2..|3.."}[1h]))
+      /
+      sum by(job) (rate(smart_api_requests_total{job="smart-monitor"}[1h]))
+
+  # --- Alert delivery latency < 3s (good / total) ---
+  - record: smart_monitor:alert_delivery_lt_3s:ratio_rate5m
+    expr: |
+      sum by(job) (rate(smart_monitor_alert_delivery_seconds_bucket{job="smart-monitor", le="3"}[5m]))
+      /
+      sum by(job) (rate(smart_monitor_alert_delivery_seconds_bucket{job="smart-monitor", le="+Inf"}[5m]))
+
+  - record: smart_monitor:alert_delivery_lt_3s:ratio_rate1h
+    expr: |
+      sum by(job) (rate(smart_monitor_alert_delivery_seconds_bucket{job="smart-monitor", le="3"}[1h]))
+      /
+      sum by(job) (rate(smart_monitor_alert_delivery_seconds_bucket{job="smart-monitor", le="+Inf"}[1h]))
+
+  # --- Auto-recovery success rate (auto_resolved / all incidents) ---
+  - record: smart_monitor:auto_recovery:ratio_rate1h
+    expr: |
+      sum by(job) (rate(smart_recovery_incidents_total{job="smart-monitor", outcome="auto_resolved"}[1h]))
+      /
+      sum by(job) (rate(smart_recovery_incidents_total{job="smart-monitor"}[1h]))
+
+  # --- Agents up ratio (Option A: metric smart_agent_up already provided) ---
+  - record: smart_monitor:agents_up:ratio_inst
+    expr: |
+      sum by(job) (smart_agent_up{job="smart-monitor"}==1)
+      /
+      count by(job) (smart_agent_up{job="smart-monitor"})
+
+  # If you DO NOT have smart_agent_up, but you expose smart_agent_last_heartbeat_seconds,
+  # uncomment and use the following to derive a "up in last 60s" gauge per agent.
+  # - record: smart_agent_up
+  #   expr: |
+  #     (time() - smart_agent_last_heartbeat_seconds) < 60
+
+  # --- Disk-full remediation < 120s (good / total) ---
+  - record: smart_monitor:diskfull_fix_lt_120s:ratio_rate1h
+    expr: |
+      sum by(job) (rate(smart_recovery_diskfull_duration_seconds_bucket{job="smart-monitor", le="120"}[1h]))
+      /
+      sum by(job) (rate(smart_recovery_diskfull_duration_seconds_bucket{job="smart-monitor", le="+Inf"}[1h]))
+
+- name: smart-monitor-slo-alerts
+  rules:
+  # ------------------------------
+  # SLO: API availability >= 99.9%
+  # Error budget = 0.001
+  # Page when burn rate > 14.4 on 5m & 1h; Ticket when > 2 on 6h & 3d
+  # ------------------------------
+  - alert: SLOApiAvailabilityFastBurn
+    expr: |
+      (1 - smart_monitor:api_availability:ratio_rate5m) / (1 - 0.999) > 14.4
+      and
+      (1 - smart_monitor:api_availability:ratio_rate1h) / (1 - 0.999) > 14.4
+    for: 2m
+    labels:
+      severity: page
+      slo: "api_availability"
+      objective: "99.9% over 30d"
+    annotations:
+      summary: "API availability burn-rate too high (fast)"
+      description: "Error budget burning fast on 5m & 1h. Investigate API errors and dependencies."
+
+  - alert: SLOApiAvailabilitySlowBurn
+    expr: |
+      (1 - smart_monitor:api_availability:ratio_rate1h) / (1 - 0.999) > 2
+    for: 6h
+    labels:
+      severity: ticket
+      slo: "api_availability"
+      objective: "99.9% over 30d"
+    annotations:
+      summary: "API availability burn-rate high (slow)"
+      description: "Sustained error-budget burn. Prioritize reliability work and rollbacks if needed."
+
+  # ------------------------------
+  # SLO: Alert delivery < 3s for 99.0% of alerts
+  # Error budget = 0.01
+  # ------------------------------
+  - alert: SLOAlertDeliveryFastBurn
+    expr: |
+      (1 - smart_monitor:alert_delivery_lt_3s:ratio_rate5m) / (1 - 0.99) > 14.4
+      and
+      (1 - smart_monitor:alert_delivery_lt_3s:ratio_rate1h) / (1 - 0.99) > 14.4
+    for: 5m
+    labels:
+      severity: page
+      slo: "alert_delivery_lt_3s"
+      objective: "99.0% over 30d"
+    annotations:
+      summary: "Alert delivery (<3s) burn-rate too high (fast)"
+      description: "SSE delivery latency exceeding 3s for too many alerts. Check brokers, network, or load."
+
+  - alert: SLOAlertDeliverySlowBurn
+    expr: |
+      (1 - smart_monitor:alert_delivery_lt_3s:ratio_rate1h) / (1 - 0.99) > 2
+    for: 6h
+    labels:
+      severity: ticket
+      slo: "alert_delivery_lt_3s"
+      objective: "99.0% over 30d"
+    annotations:
+      summary: "Alert delivery (<3s) burn-rate elevated (slow)"
+      description: "Sustained degradation in alert delivery latency. Investigate queue backlogs or CPU."
+
+  # ------------------------------
+  # SLO: Auto-recovery success >= 80%
+  # Error budget = 0.20
+  # ------------------------------
+  - alert: SLOAutoRecoveryFastBurn
+    expr: |
+      (1 - smart_monitor:auto_recovery:ratio_rate1h) / (1 - 0.80) > 14.4
+    for: 1h
+    labels:
+      severity: page
+      slo: "auto_recovery_success"
+      objective: ">=80% over 30d"
+    annotations:
+      summary: "Auto-recovery success burn-rate too high"
+      description: "Too many incidents require manual intervention. Review runbooks and automation coverage."
+
+  # ------------------------------
+  # SLO: Agents up >= 99.5%
+  # Error budget = 0.005
+  # ------------------------------
+  - alert: SLOAgentsUpFastBurn
+    expr: |
+      (1 - smart_monitor:agents_up:ratio_inst) / (1 - 0.995) > 14.4
+    for: 10m
+    labels:
+      severity: page
+      slo: "agents_up"
+      objective: "99.5% over 30d"
+    annotations:
+      summary: "Agent heartbeat coverage burn-rate too high"
+      description: "Agents not reporting within 60s. Check network, agent crashes, or auth issues."
+
+  # ------------------------------
+  # SLO: Disk-full remediation < 120s for 95%
+  # Error budget = 0.05
+  # ------------------------------
+  - alert: SLODiskFullRemediationFastBurn
+    expr: |
+      (1 - smart_monitor:diskfull_fix_lt_120s:ratio_rate1h) / (1 - 0.95) > 14.4
+    for: 1h
+    labels:
+      severity: ticket
+      slo: "diskfull_fix_lt_120s"
+      objective: "95.0% over 30d"
+    annotations:
+      summary: "Disk-full remediation (<120s) burn-rate elevated"
+      description: "Remediation taking too long. Check cleanup scripts, inode pressure, or read-only mounts."
