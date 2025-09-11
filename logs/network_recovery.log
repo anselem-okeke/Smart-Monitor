@@ -5555,3 +5555,8 @@
 2025-09-08 02:09:32,338  WARNING  hostname=web01,target=192.168.56.14,method=ping,action=nic_bounce,latency=None,result=still_down loss=100.0
 2025-09-08 02:09:33,428  WARNING  hostname=web01,target=google.com,method=traceroute,action=nic_bounce,latency=None,result=still_down
 2025-09-08 02:09:35,527  WARNING  hostname=web01,target=google.com,method=ping,action=nic_bounce,latency=None,result=still_down
+2025-09-11 01:13:14,562  WARNING  hostname=web01,target=192.168.56.13,method=ping,action=nic_bounce,latency=None,result=still_down loss=100.0
+2025-09-11 01:13:14,627  WARNING  hostname=web01,target=fake9876543210notrealexample.com,method=nslookup,action=dns_fix,latency=None,result=DNS-restart failed
+2025-09-11 01:13:14,665  WARNING  hostname=web01,target=192.168.10.1,method=nslookup,action=dns_fix,latency=None,result=DNS-restart failed
+2025-09-11 01:13:14,692  WARNING  hostname=web01,target=192.168.56.17,method=nslookup,action=dns_fix,latency=None,result=DNS-restart failed
+2025-09-11 01:13:14,707  WARNING  hostname=web01,target=192.168.56.13,method=ping,action=nic_bounce,latency=None,result=still_down loss=100.0

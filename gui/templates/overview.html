@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="cards" id="summary-cards"></section>
+<section>
+  <h2>Latest Alerts</h2>
+  <table class="table" id="latest-alerts">
+    <thead><tr><th>Time</th><th>Host</th><th>Severity</th><th>Source</th><th>Message</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+<script>
+  window.addEventListener('DOMContentLoaded', async () => {
+    const res = await fetch('/api/summary');
+    const data = await res.json();
+    // cards
+    const c = document.getElementById('summary-cards');
+    c.innerHTML = `
+      <div class="card"><div class="metric">${data.total_hosts}</div><div class="label">Hosts</div></div>
+      <div class="card"><div class="metric">${data.alerts_24h}</div><div class="label">Alerts (24h)</div></div>
+      <div class="card"><div class="metric">${data.recovery_24h}</div><div class="label">Recoveries (24h)</div></div>
+      <div class="card"><div class="metric">${data.avg_cpu}%</div><div class="label">Avg CPU (1h)</div></div>`;
+    // table
+    const tbody = document.querySelector('#latest-alerts tbody');
+    tbody.innerHTML = data.latest_alerts.map(a => (
+      `<tr><td>${a.timestamp}</td><td>${a.hostname||''}</td><td class="sev ${a.severity}">${a.severity}</td><td>${a.source}</td><td>${a.message}</td></tr>`
+    )).join('');
+
+    // SSE to prepend new alerts
+    const es = new EventSource('/api/stream/alerts');
+    es.addEventListener('alert', ev => {
+      const a = JSON.parse(ev.data);
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${a.timestamp}</td><td>${a.hostname||''}</td><td class="sev ${a.severity}">${a.severity}</td><td>${a.source}</td><td>${a.message}</td>`;
+      tbody.prepend(row);
+      // simple toast
+      window.smartToast && window.smartToast(`${a.severity.toUpperCase()}: ${a.source} — ${a.message}`);
+    });
+  });
+</script>
+{% endblock %}
