@@ -1,10 +1,230 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-</body>
-</html>
+{% block title %}Host {{ host }} · Smart Monitor{% endblock %}
+
+{% block content %}
+<h2>Host: {{ host }}</h2>
+
+<form id="rangeForm" style="margin:8px 0">
+  <label>Range:
+    <select id="rangeSelect" name="minutes">
+      <option value="15"   {% if minutes == 15 %}selected{% endif %}>15m</option>
+      <option value="60"   {% if minutes == 60 %}selected{% endif %}>1h</option>
+      <option value="360"  {% if minutes == 360 %}selected{% endif %}>6h</option>
+      <option value="1440" {% if minutes == 1440 %}selected{% endif %}>24h</option>
+    </select>
+  </label>
+</form>
+
+<div class="grid">
+  <div class="chart"><canvas id="cpuChart"></canvas></div>
+  <div class="chart"><canvas id="memChart"></canvas></div>
+  <div class="chart"><canvas id="loadChart"></canvas></div>
+  <div class="chart"><canvas id="swapChart"></canvas></div>
+  <div class="chart"><canvas id="inodeChart"></canvas></div>
+</div>
+
+<h3>Services</h3>
+<table class="table" id="svcTable">
+  <thead>
+    <tr><th>Service</th><th>Status</th><th>Updated</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+/* ---------------------------
+   Small helpers
+---------------------------- */
+const host = {{ host|tojson }};
+const minutes = {{ minutes|tojson }};
+
+function showMsg(text) {
+  const msg = document.createElement('div');
+  msg.style.margin = '8px 0';
+  msg.textContent = text;
+  document.querySelector('.grid').before(msg);
+}
+
+function toNum(v){ return v == null ? null : Number(v); }
+
+function fitCanvasToParent(canvasEl){
+  const p = canvasEl.parentElement;
+  canvasEl.width  = p.clientWidth;
+  canvasEl.height = p.clientHeight;
+}
+
+function normalizePercent(arr){
+  // Returns {data, suffix}, infers if values are fraction, percent, or absolute
+  const nums = arr.map(toNum).filter(v => v != null && !Number.isNaN(v));
+  if (!nums.length) return { data: arr.map(toNum), suffix: '' };
+  const max = Math.max(...nums);
+  if (max <= 1)   return { data: arr.map(v => v == null ? null : Number(v)*100), suffix: '%' };
+  if (max <= 100) return { data: arr.map(toNum), suffix: '%' };
+  return { data: arr.map(toNum), suffix: '' }; // absolute units
+}
+
+function parseUtcNaive(utcStr){
+  if (!utcStr) return null;
+  const iso = utcStr.replace(' ', 'T') + 'Z'; // mark as UTC
+  const d = new Date(iso);
+  return isNaN(d) ? null : d;
+}
+function fmtLocal(d){
+  return new Intl.DateTimeFormat(undefined, {
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit'
+  }).format(d);
+}
+function fmtAgo(d){
+  const now = new Date();
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric:'auto' });
+  let diff = Math.round((d - now) / 1000); // seconds (negative for past)
+  const steps = [
+    ['year',   60*60*24*365],
+    ['month',  60*60*24*30],
+    ['week',   60*60*24*7],
+    ['day',    60*60*24],
+    ['hour',   60*60],
+    ['minute', 60],
+    ['second', 1],
+  ];
+  for (const [unit, secs] of steps) {
+    if (Math.abs(diff) >= secs || unit === 'second') {
+      return rtf.format(Math.round(diff / secs), unit);
+    }
+  }
+}
+
+/* ---------------------------
+   UI events
+---------------------------- */
+(function(){
+  const sel = document.getElementById('rangeSelect');
+  sel.addEventListener('change', function(){
+    const h = encodeURIComponent('{{ host }}');
+    location.href = '/hosts/' + h + '?minutes=' + this.value;
+  });
+})();
+
+/* ---------------------------
+   Charts
+---------------------------- */
+function makeChartFactory(ts){
+  return (id, label, data) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    fitCanvasToParent(el);
+    return new Chart(el.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: ts,
+        datasets: [{ label, data, pointRadius: 0, borderWidth: 2, tension: 0.25 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { x: { display: false } }
+      }
+    });
+  };
+}
+
+async function renderCharts(){
+  if (!window.Chart){
+    console.error('Chart.js not loaded');
+    showMsg("Charts library didn't load. Check network or CSP.");
+    return;
+  }
+  const url = `/api/hosts/${encodeURIComponent(host)}/metrics?minutes=${minutes}`;
+  const resp = await fetch(url);
+  if (!resp.ok){
+    showMsg('Failed to load metrics.');
+    console.error('Metrics fetch failed:', resp.status, await resp.text());
+    return;
+  }
+  const rows = await resp.json();
+  if (!Array.isArray(rows) || rows.length === 0){
+    showMsg('No metrics in this time window. Try a larger range.');
+    return;
+  }
+  if (rows.length < 3){
+    showMsg('Not much data in this time window. Try a larger range.');
+  }
+
+  const ts = rows.map(r => r.timestamp ?? r.ts ?? r.time);
+  const mk = makeChartFactory(ts);
+
+  // CPU
+  mk('cpuChart', 'CPU %', rows.map(r => toNum(r.cpu_usage)));
+
+  // Memory (smart normalize)
+  const mem = normalizePercent(rows.map(r => toNum(r.memory_usage)));
+  mk('memChart', `Memory ${mem.suffix}`, mem.data);
+
+  // Load
+  mk('loadChart', 'Load avg', rows.map(r => toNum(r.load_average)));
+
+  // Swap (smart normalize)
+  const sw = normalizePercent(rows.map(r => toNum(r.swap_usage)));
+  mk('swapChart', `Swap ${sw.suffix}`, sw.data);
+
+  // Inodes (smart normalize)
+  const ino = normalizePercent(rows.map(r => toNum(r.inode_usage)));
+  mk('inodeChart', `Inode ${ino.suffix}`, ino.data);
+}
+
+/* ---------------------------
+   Services table
+---------------------------- */
+async function renderServices(){
+  const url = `/api/hosts/${encodeURIComponent(host)}/services`;
+  const resp = await fetch(url);
+  if (!resp.ok){
+    console.warn('Services fetch failed', resp.status);
+    return;
+  }
+  const svcs = await resp.json();
+
+  const rowsHtml = (Array.isArray(svcs) ? svcs : []).map(s => {
+    const name   = s.service_name ?? s.name ?? s.unit ?? '';
+    const status = s.normalized_status ?? s.status ?? s.state ?? '';
+    const sub    = s.sub_state ?? '';
+    const when   = s.timestamp ?? s.updated_at ?? s.ts ?? '';
+
+    const norm = String(status).toLowerCase();
+    const badgeClass =
+      norm === 'active' || norm.includes('running') ? 'running' :
+      norm === 'stopped' || norm === 'inactive'     ? 'stopped' : '';
+
+    const statusText = sub && !norm.includes(sub.toLowerCase())
+      ? `${status} (${sub})` : (status || '—');
+
+    const d = parseUtcNaive(when);
+    const abs = d ? fmtLocal(d) : (when || '');
+    const rel = d ? ` <span class="muted">(${fmtAgo(d)})</span>` : '';
+
+    return `<tr>
+      <td>${name}</td>
+      <td class="badge ${badgeClass}">${statusText}</td>
+      <td><span title="${when}">${abs}${rel}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.querySelector('#svcTable tbody').innerHTML = rowsHtml;
+}
+
+/* ---------------------------
+   Boot
+---------------------------- */
+(async function(){
+  try {
+    await renderCharts();
+    await renderServices();
+  } catch (e) {
+    console.error('Render error:', e);
+    showMsg('Error rendering page. See console for details.');
+  }
+})();
+</script>
+{% endblock %}

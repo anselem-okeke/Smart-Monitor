@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Hosts</h2>
+<table class="table">
+  <thead><tr><th>Host</th><th>Last Seen</th><th>CPU</th><th>Mem</th><th>Load</th></tr></thead>
+  <tbody>
+    {% for h in hosts %}
+      <tr>
+        <td><a href="/hosts/{{ h.hostname }}">{{ h.hostname }}</a></td>
+        <td>{{ h.last_ts }}</td>
+        <td>{{ (h.last.cpu_usage if h.last else '') }}</td>
+        <td>{{ (h.last.memory_usage if h.last else '') }}</td>
+        <td>{{ (h.last.load_average if h.last else '') }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

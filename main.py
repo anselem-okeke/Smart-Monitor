@@ -27,6 +27,7 @@ import signal
 import socket
 import time
 import traceback
+from multiprocessing import Queue, Process
 
 from db.auto_init import ensure_db_initialized
 from scripts.monitor.monitor_system import handle_monitor_system
@@ -178,6 +179,31 @@ def _with_jitter(base, frac):
     val = base + random.uniform(-span, span)
     return max(0.5 * base, val)
 
+def run_fn(fn, q):
+    try:
+        fn()
+        q.put(("ok", None))
+    except Exception:
+        q.put(("err", traceback.format_exc()))
+
+def run_handler_with_timeout(name, fn, timeout_sec):
+    q = Queue()
+    p = Process(target=run_fn, args=(fn, q), daemon=True)
+    p.start()
+    p.join(timeout=timeout_sec)
+    if p.is_alive():
+        p.terminate()
+        p.join(1)
+        log.error(f"{name} TIMEOUT after {timeout_sec}...")
+        return False
+    status, err = q.get_nowait()
+    if status == "ok":
+        log.info(f"{name} OK...")
+        return True
+    else:
+        log.error(f"{name} FAILED\n{err}...")
+        return False
+
 def run_handler(name, fn):
     start = time.time()
     try:
@@ -215,10 +241,11 @@ def main():
     while not _SHUTDOWN:
         now = time.time()
         did_any = False
+
         for h in handlers:
             if now >= h["next"]:
                 did_any = True
-                run_handler(h["name"], h["fn"])
+                run_handler_with_timeout(h["name"], h["fn"], h.get("timeout", 30))
                 h["next"] = time.time() + _with_jitter(h["interval"], h["jitter"])
         if run_once:
             break
@@ -229,3 +256,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# vagrant ssh web01 -- -N -L 5003:127.0.0.1:5000
