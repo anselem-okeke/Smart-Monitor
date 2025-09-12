@@ -3,22 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Smart Monitor</title>
+  <title>{% block title %}Smart Monitor{% endblock %}</title>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css" />
   <link rel="stylesheet" href="{{ url_for('ui.static', filename='css/styles.css') }}" />
+
+  <!-- Chart.js first -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Your global app JS (keep if you have it) -->
   <script defer src="{{ url_for('ui.static', filename='js/app.js') }}"></script>
+
+  <!-- Global Chart.js defaults to prevent aspect-ratio issues -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.Chart) {
+        Chart.defaults.maintainAspectRatio = false;
+        Chart.defaults.responsive = true;
+        Chart.defaults.animation = false; // optional: avoids flicker
+      }
+    });
+  </script>
 </head>
 <body>
   <aside class="sidebar">
     <h1>Smart Monitor</h1>
     <nav>
       <a href="{{ url_for('ui.overview') }}">Overview</a>
-      <a href="/api/hosts" target="_blank">API: Hosts</a>
+      <a href="{{ url_for('ui.hosts_list') }}">All Hosts</a>
+      <a href="/hosts/web01">Host: web01</a>
     </nav>
   </aside>
+
   <main class="content">
     {% block content %}{% endblock %}
   </main>
 </body>
 </html>
+
+
+
+
+
+
+
+

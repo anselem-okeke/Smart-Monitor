@@ -5,4 +5,4 @@ ui_bp = Blueprint(
     static_folder="../static"
 )
 
-from . import overview
+from . import overview, hosts

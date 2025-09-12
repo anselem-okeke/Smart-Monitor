@@ -84,3 +84,63 @@ def get_summary():
         "avg_cpu": avg_cpu,
         "latest_alerts": latest_alerts,
     }
+
+def present_columns(conn, table):
+    cur = conn.cursor()
+    cur.execute(f"PRAGMA table_info({table})")
+    return {row["name"] for row in cur.fetchall()}
+
+def list_hosts():
+    """Basic host list with last-seen timestamp + last metrics snapshot."""
+    with connect_ro() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT hostname, MAX(timestamp) AS last_ts
+            FROM system_metrics GROUP BY hostname ORDER BY hostname
+        """)
+        rows = cur.fetchall()
+        out = []
+        for r in rows:
+            hostname = r["hostname"]
+            cur.execute("""
+                SELECT timestamp, cpu_usage, memory_usage, load_average, swap_usage, inode_usage, disk_usage
+                FROM system_metrics WHERE hostname=? ORDER BY id DESC LIMIT 1
+            """, (hostname,))
+            last = cur.fetchone()
+            out.append({"hostname": hostname, "last_ts": r["last_ts"], "last": last})
+        return out
+
+def host_metrics(hostname: str, minutes: int = 60, limit: int = 5000):
+    """
+    Return time-series for charts. If optional columns don't exist, they come back as NULL.
+    """
+    from datetime import datetime, timedelta
+    since = (datetime.utcnow() - timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
+    with connect_ro() as conn:
+        cols_all = ["timestamp","cpu_usage","memory_usage","load_average","swap_usage","inode_usage","disk_usage"]
+        present = present_columns(conn, "system_metrics")
+        select_exprs = [c if c in present else f"NULL AS {c}" for c in cols_all]
+        sql = f"""
+            SELECT {", ".join(select_exprs)}
+            FROM system_metrics
+            WHERE hostname=? AND timestamp >= ?
+            ORDER BY timestamp ASC LIMIT ?
+        """
+        cur = conn.cursor()
+        cur.execute(sql, (hostname, since, limit))
+        return cur.fetchall()
+
+def host_services(hostname: str):
+    """Latest status per service for a host."""
+    with connect_ro() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT s1.service_name, s1.normalized_status, s1.timestamp
+            FROM service_status s1
+            JOIN (
+              SELECT service_name, MAX(id) AS max_id
+              FROM service_status WHERE hostname=? GROUP BY service_name
+            ) s2 ON s1.service_name = s2.service_name AND s1.id = s2.max_id
+            ORDER BY s1.service_name
+        """, (hostname,))
+        return cur.fetchall()
