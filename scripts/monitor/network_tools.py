@@ -59,39 +59,83 @@ def extract_latency(output, system):
         print(f"[ERROR] extract_latency: {e}")
     return None
 
-def check_for_alerts(event):
+
+def check_for_alerts(event, *, loss_warn=10.0, loss_crit=50.0, high_latency_ms=200.0):
+    # Only for ping signals
+    if event.get("method") != "ping":
+        return
+
+    host = event.get("hostname")
+    tgt  = event.get("target")
+    st   = (event.get("status") or "").lower()
+    lat  = event.get("latency_ms")
+    loss = event.get("packet_loss_percent")
+
     alerts = []
 
-    # Fallback alert for total failure
-    if event['status'] == "error":
-        alerts.append({
-            "hostname": event["hostname"],
-            "severity": "critical",
-            "source": f"ping:{event['target']}",
-            "message": f"Ping failed entirely: {event['result'][:60]}..."
-        })
+    # Down / total failure
+    if st in ("error", "fail"):
+        msg = f"Ping failed: {tgt} (status={st}, loss={loss})"
+        alerts.append({"hostname": host, "severity": "critical",
+                       "source": f"ping:{tgt}", "message": msg})
 
-    # Latency-based alert
-    if event['latency_ms'] is not None and event['latency_ms'] > 200:
-        alerts.append({
-            "hostname": event["hostname"],
-            "severity": "warning",
-            "source": f"ping:{event['target']}",
-            "message": f"High latency: {event['latency_ms']} ms"
-        })
+    # Partial loss
+    elif st == "degraded" and loss is not None:
+        if loss >= loss_crit:
+            sev = "critical"
+        elif loss >= loss_warn:
+            sev = "warning"
+        else:
+            sev = None
+        if sev:
+            alerts.append({"hostname": host, "severity": sev,
+                           "source": f"ping:{tgt}",
+                           "message": f"Packet loss {loss:.1f}% to {tgt}"})
 
-    # Packet loss alert
-    if event['packet_loss_percent'] is not None and event['packet_loss_percent'] > 10:
-        alerts.append({
-            "hostname": event["hostname"],
-            "severity": "critical",
-            "source": f"ping:{event['target']}",
-            "message": f"Packet loss: {event['packet_loss_percent']}%"
-        })
+    # High latency (only when otherwise OK)
+    if st in ("success", "degraded") and lat is not None and lat > high_latency_ms:
+        alerts.append({"hostname": host, "severity": "warning",
+                       "source": f"ping:{tgt}",
+                       "message": f"High latency {lat:.0f} ms to {tgt}"})
 
-    for alert in alerts:
-        log_alert(alert)
-        print(f"[ALERT] {alert['severity'].upper()} - {alert['message']}")
+    for a in alerts:
+        log_alert(a)
+        print(f"[ALERT] {a['severity'].upper()} - {a['message']}")
+
+
+# def check_for_alerts(event):
+#     alerts = []
+#
+#     # Fallback alert for total failure
+#     if event['status'] == "error":
+#         alerts.append({
+#             "hostname": event["hostname"],
+#             "severity": "critical",
+#             "source": f"ping:{event['target']}",
+#             "message": f"Ping failed entirely: {event['result'][:60]}..."
+#         })
+#
+#     # Latency-based alert
+#     if event['latency_ms'] is not None and event['latency_ms'] > 200:
+#         alerts.append({
+#             "hostname": event["hostname"],
+#             "severity": "warning",
+#             "source": f"ping:{event['target']}",
+#             "message": f"High latency: {event['latency_ms']} ms"
+#         })
+#
+#     # Packet loss alert
+#     if event['packet_loss_percent'] is not None and event['packet_loss_percent'] > 10:
+#         alerts.append({
+#             "hostname": event["hostname"],
+#             "severity": "critical",
+#             "source": f"ping:{event['target']}",
+#             "message": f"Packet loss: {event['packet_loss_percent']}%"
+#         })
+#
+#     for alert in alerts:
+#         log_alert(alert)
+#         print(f"[ALERT] {alert['severity'].upper()} - {alert['message']}")
 
 
 # def check_for_alerts(event):
@@ -150,6 +194,7 @@ def run_traceroute(target):
             "status": "error"
         }
 
+
 def ping_host(target):
     system = platform.system()
     count_flag = "-n" if system == "Windows" else "-c"
@@ -161,16 +206,30 @@ def ping_host(target):
             text=True,
             timeout=10
         )
-        status = "success" if result.returncode == 0 else "fail"
+        # parse first
         latency = extract_latency(result.stdout, system)
-        packet_loss = extract_packet_loss(result.stdout, system)
+        loss    = extract_packet_loss(result.stdout, system)
+
+        # derive state from both rc and loss
+        rc = result.returncode
+        if loss is not None:
+            if loss >= 100.0:
+                status = "fail"        # total loss
+            elif loss > 0.0:
+                status = "degraded"    # partial loss, still got replies
+            else:
+                status = "success" if rc == 0 else "fail"
+        else:
+            # no loss parsed -> fall back to rc
+            status = "success" if rc == 0 else "fail"
+
         return {
             "hostname": socket.gethostname(),
             "target": target,
             "method": "ping",
             "result": result.stdout,
             "latency_ms": latency,
-            "packet_loss_percent": packet_loss,
+            "packet_loss_percent": loss,
             "status": status
         }
     except Exception as e:
@@ -183,6 +242,40 @@ def ping_host(target):
             "packet_loss_percent": None,
             "status": "error"
         }
+
+# def ping_host(target):
+#     system = platform.system()
+#     count_flag = "-n" if system == "Windows" else "-c"
+#     try:
+#         result = subprocess.run(
+#             ["ping", count_flag, "4", target],
+#             stdout=subprocess.PIPE,
+#             stderr=subprocess.PIPE,
+#             text=True,
+#             timeout=10
+#         )
+#         status = "success" if result.returncode == 0 else "fail"
+#         latency = extract_latency(result.stdout, system)
+#         packet_loss = extract_packet_loss(result.stdout, system)
+#         return {
+#             "hostname": socket.gethostname(),
+#             "target": target,
+#             "method": "ping",
+#             "result": result.stdout,
+#             "latency_ms": latency,
+#             "packet_loss_percent": packet_loss,
+#             "status": status
+#         }
+#     except Exception as e:
+#         return {
+#             "hostname": socket.gethostname(),
+#             "target": target,
+#             "method": "ping",
+#             "result": str(e),
+#             "latency_ms": None,
+#             "packet_loss_percent": None,
+#             "status": "error"
+#         }
 
 def run_nslook(target):
     system = platform.system()

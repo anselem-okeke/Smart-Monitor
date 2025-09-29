@@ -1,10 +1,125 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'base.html' %}
+{% block content %}
 
-</body>
-</html>
+<h2>Alerts</h2>
+
+<form id="filterForm" class="filters" style="margin:8px 0;">
+  <input name="host" placeholder="hostname (optional)" />
+  <select name="severity">
+    <option value="">Any severity</option>
+    <option value="info">info</option>
+    <option value="warning">warning</option>
+    <option value="critical">critical</option>
+  </select>
+  <input name="since_minutes" type="number" min="1" value="1440" title="Since (minutes)" />
+  <input name="limit" type="number" min="10" max="500" value="50" />
+  <button type="submit">Apply</button>
+  <button type="button" id="exportCsv">Export CSV</button>
+</form>
+
+<table class="table" id="alertsTable">
+  <thead>
+    <tr><th>ID</th><th>Time</th><th>Host</th><th>Severity</th><th>Source</th><th>Message</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<div class="pager">
+  <button id="prevBtn">Prev</button>
+  <span id="pageInfo"></span>
+  <button id="nextBtn">Next</button>
+</div>
+
+<script>
+(function(){
+  const form = document.getElementById('filterForm');
+  const tb = document.querySelector('#alertsTable tbody');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const pageInfo = document.getElementById('pageInfo');
+  const exportBtn = document.getElementById('exportCsv');
+
+  let offset = 0;
+  let total = 0;
+
+  function qsObj() {
+    const fd = new FormData(form);
+    const o = {};
+    for (const [k,v] of fd.entries()) if (v !== '') o[k] = v;
+    o.offset = offset;
+    return o;
+  }
+
+  function toQuery(o){
+    const p = new URLSearchParams();
+    Object.entries(o).forEach(([k,v]) => p.append(k, v));
+    return p.toString();
+  }
+
+  async function load(){
+    const q = qsObj();
+    const res = await fetch('/api/alerts?' + toQuery(q));
+    const data = await res.json();
+    total = data.total || 0;
+    const items = data.items || [];
+    const limit = Number(q.limit || 50);
+
+    tb.innerHTML = items.map(a => `
+      <tr>
+        <td>${a.id}</td>
+        <td>${a.timestamp}</td>
+        <td>${a.hostname ? `<a href="/hosts/${encodeURIComponent(a.hostname)}" target="_blank">${a.hostname}</a>` : ''}</td>
+        <td class="sev ${a.severity}">${a.severity}</td>
+        <td>${a.source}</td>
+        <td>${a.message}</td>
+      </tr>
+    `).join('');
+
+    const start = total ? (offset + 1) : 0;
+    const end = Math.min(offset + limit, total);
+    pageInfo.textContent = `${start}-${end} of ${total}`;
+    prevBtn.disabled = offset <= 0;
+    nextBtn.disabled = offset + limit >= total;
+
+    // push state for deep link
+    history.replaceState(null, '', '/alerts?' + toQuery(q));
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    offset = 0; // reset paging when filters change
+    load();
+  });
+
+  prevBtn.addEventListener('click', () => {
+    const limit = Number(new FormData(form).get('limit') || 50);
+    offset = Math.max(0, offset - limit);
+    load();
+  });
+
+  nextBtn.addEventListener('click', () => {
+    const limit = Number(new FormData(form).get('limit') || 50);
+    offset = offset + limit;
+    load();
+  });
+
+  exportBtn.addEventListener('click', () => {
+    const q = qsObj();
+    const url = '/api/alerts.csv?' + toQuery(q);
+    window.open(url, '_blank');
+  });
+
+  // Initialize from URL (deep link support)
+  (function initFromUrl(){
+    const params = new URLSearchParams(location.search);
+    ['host','severity','since_minutes','limit'].forEach(k => {
+      if (params.has(k)) form.elements[k].value = params.get(k);
+    });
+    if (params.has('offset')) offset = Number(params.get('offset'));
+  })();
+
+  load();
+})();
+</script>
+
+{% endblock %}

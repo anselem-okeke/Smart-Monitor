@@ -31,13 +31,31 @@
     <nav>
       <a href="{{ url_for('ui.overview') }}">Overview</a>
       <a href="{{ url_for('ui.hosts_list') }}">All Hosts</a>
-      <a href="/hosts/web01">Host: web01</a>
+      <a href="{{ url_for('ui.alerts_view') }}">Alerts</a>
+      <a href="{{ url_for('ui.network_view') }}">Network</a>
     </nav>
   </aside>
 
   <main class="content">
     {% block content %}{% endblock %}
   </main>
+
+<!--  <footer class="footer" role="contentinfo">-->
+<!--    {{ app_name }} v{{ app_version }}{% if git_sha %} ({{ git_sha }}){% endif %}.-->
+<!--    Powered by-->
+<!--    <a href="https://flask.palletsprojects.com/" target="_blank" rel="noopener">Flask</a>-->
+<!--    and-->
+<!--    <a href="https://www.sqlite.org/" target="_blank" rel="noopener">SQLite</a>.-->
+<!--    © {{ current_year }}-->
+<!--    <a class="owner-link" href="{{ author_url }}" target="_blank" rel="noopener">-->
+<!--      {% if author_avatar %}-->
+<!--        <img class="owner-avatar" src="{{ author_avatar }}" alt="{{ author_name }} avatar">-->
+<!--      {% endif %}-->
+<!--      {{ author_name }}-->
+<!--    </a>.-->
+<!--  </footer>-->
+
+
 </body>
 </html>
 

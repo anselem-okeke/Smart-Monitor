@@ -12,7 +12,8 @@ REQUIRED_TABLES = [
     "system_metrics",
     "network_logs",
     "process_status",
-    "restart_attempts"
+    "restart_attempts",
+    "smart_health"
 ]
 
 def default_db_path():
@@ -40,6 +41,7 @@ def ensure_db_initialized():
     try:
         # Friendly settings for many readers + one writer
         con.execute("PRAGMA journal_mode=WAL;")
+        con.execute("PRAGMA synchronous=NORMAL;")
         con.execute("PRAGMA busy_timeout=5000;")
 
         # What tables exist now?

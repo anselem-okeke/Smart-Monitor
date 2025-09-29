@@ -66,12 +66,14 @@ fi
 # Graceful shutdown
 trap '[[ -n "${NGROK_PID}" ]] && kill "$NGROK_PID" 2>/dev/null || true; kill "$SQLITE_PID" 2>/dev/null || true' INT TERM
 
-# Stream logs
-tail -F /var/log/smartmon/sqliteweb.log "$NGROK_LOG" &
-TAIL_PID=$!
+## Stream logs
+#tail -F /var/log/smartmon/sqliteweb.log "$NGROK_LOG" &
+#TAIL_PID=$!
+## Wait on children
+#wait -n "$SQLITE_PID" ${NGROK_PID:+$NGROK_PID} "$TAIL_PID"
 
-# Wait on children
-wait -n "$SQLITE_PID" ${NGROK_PID:+$NGROK_PID} "$TAIL_PID"
+tail -F /var/log/smartmon/sqliteweb.log "$NGROK_LOG" &
+wait "$SQLITE_PID"
 
 
 

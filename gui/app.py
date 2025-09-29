@@ -1,12 +1,93 @@
+# import os
+#
+# from flask import Flask
+# from .api import api_bp
+# from .views import ui_bp
+# from datetime import datetime
+#
+# def _git_sha():
+#     try:
+#         import subprocess
+#         return subprocess.check_output(
+#             ["git", "rev-parse", "--short", "HEAD"],
+#             stderr=subprocess.DEVNULL,
+#         ).decode().strip()
+#     except Exception:
+#         return None
+#
+# def create_app():
+#     app = Flask(__name__)
+#
+#     # --- Footer/meta config ---
+#     app.config["APP_NAME"] = os.getenv("SMARTMONITOR_APP_NAME", "Smart-Monitor")
+#     app.config["APP_VERSION"] = os.getenv("SMARTMONITOR_VERSION", "0.1.0")
+#     app.config["COPYRIGHT_OWNER"] = os.getenv("SMARTMONITOR_COPYRIGHT", "Your Company")
+#
+#     @app.context_processor
+#     def inject_footer_meta():
+#         return {
+#             "app_name": app.config["APP_NAME"],
+#             "app_version": app.config["APP_VERSION"],
+#             "copyright_owner": app.config["COPYRIGHT_OWNER"],
+#             "current_year": datetime.utcnow().year,
+#             "git_sha": _git_sha(),
+#         }
+#
+#     # --- Blueprints ---
+#     app.register_blueprint(api_bp, url_prefix="/api")
+#     app.register_blueprint(ui_bp)
+#     return app
+#
+# if __name__ == "__main__":
+#     create_app().run(host="0.0.0.0", port=5000, debug=True)
+
+
+# app.py
+# app.py
+import os, subprocess
+from datetime import datetime
 from flask import Flask
 from .api import api_bp
 from .views import ui_bp
 
+def _git_sha():
+    sha = os.getenv("SMARTMONITOR_GIT_SHA")
+    if sha:
+        return sha[:7]
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        return None
+
 def create_app():
     app = Flask(__name__)
+
+    app.config["APP_NAME"]      = os.getenv("SMARTMONITOR_APP_NAME", "Smart Monitor")
+    app.config["APP_VERSION"]   = os.getenv("SMARTMONITOR_VERSION", "0.1.0")
+    app.config["AUTHOR_NAME"]   = os.getenv("SMARTMONITOR_AUTHOR_NAME", "Your Name")
+    app.config["AUTHOR_URL"]    = os.getenv("SMARTMONITOR_AUTHOR_URL", "https://github.com/youruser")
+    app.config["AUTHOR_AVATAR"] = os.getenv("SMARTMONITOR_AUTHOR_AVATAR", "")  # URL or empty to hide
+    app.config["GIT_SHA"]       = _git_sha()
+
+    @app.context_processor
+    def inject_footer_meta():
+        return {
+            "app_name": app.config["APP_NAME"],
+            "app_version": app.config["APP_VERSION"],
+            "git_sha": app.config["GIT_SHA"],
+            "author_name": app.config["AUTHOR_NAME"],
+            "author_url": app.config["AUTHOR_URL"],
+            "author_avatar": app.config["AUTHOR_AVATAR"],
+            "current_year": datetime.utcnow().year,
+        }
+
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(ui_bp)
     return app
+
 
 if __name__ == "__main__":
     create_app().run(host="0.0.0.0", port=5000, debug=True)

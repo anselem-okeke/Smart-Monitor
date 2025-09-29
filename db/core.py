@@ -32,13 +32,45 @@ def resolve_db_path() -> str:
 DB_PATH = resolve_db_path()
 
 def connect_rw():
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
+    db_path = resolve_db_path()
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(DB_PATH, timeout=5.0)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA busy_timeout=5000;")
     try:
-        con.execute("PRAGMA journal_mode=WAL;")
+        mode = con.execute("PRAGMA journal_mode;").fetchone()[0]
+        if mode.lower() != "wal":
+            con.execute("PRAGMA journal_mode=WAL;")  # only if needed
     except sqlite3.OperationalError:
-        # fallback when WAL can’t be enabled (permissions/FS)
         con.execute("PRAGMA journal_mode=DELETE;")
     return con
+
+# core.py
+def _to_sqlite_ro_uri(path: str) -> str:
+    p = Path(path).resolve().as_posix()
+    # On Windows, 'file:C:/...' works; avoid extra leading slash.
+    return f"file:{p}?mode=ro&cache=shared"
+
+def connect_ro(timeout_s: float = 1.5):
+    db_path = resolve_db_path()
+    uri = _to_sqlite_ro_uri(db_path)
+    conn = sqlite3.connect(uri, uri=True, timeout=timeout_s, isolation_level=None)
+    conn.row_factory = sqlite3.Row          # or your _dict_factory if you prefer dicts
+    conn.execute(f"PRAGMA busy_timeout={int(timeout_s*1000)};")
+    conn.execute("PRAGMA query_only=ON;")
+    return conn
+
+
+
+
+# def connect_rw():
+#     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+#     con = sqlite3.connect(DB_PATH)
+#     con.row_factory = sqlite3.Row
+#     con.execute("PRAGMA busy_timeout=5000;")
+#     try:
+#         con.execute("PRAGMA journal_mode=WAL;")
+#     except sqlite3.OperationalError:
+#         # fallback when WAL can’t be enabled (permissions/FS)
+#         con.execute("PRAGMA journal_mode=DELETE;")
+#     return con

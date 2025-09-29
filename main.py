@@ -27,6 +27,7 @@ import signal
 import socket
 import time
 import traceback
+from asyncio import QueueEmpty
 from multiprocessing import Queue, Process
 
 from db.auto_init import ensure_db_initialized
@@ -38,7 +39,9 @@ from scripts.recovery.service.service_recovery import handle_service_recovery
 from scripts.recovery.disk.main import handle_disk_recovery
 from scripts.recovery.metrics.main import handle_metric_recovery
 from scripts.recovery.network.main import handle_network_recovery
+from scripts.recovery.disk.collect_smart import collect_smart_once
 
+monotonic = time.monotonic
 HOSTNAME = socket.gethostname()
 CFG_PATH = pathlib.Path(__file__).resolve().parents[0] / "config/metrics_recovery.json"
 CFG = json.load(open(CFG_PATH))
@@ -169,12 +172,22 @@ HANDLERS = [
         "interval": 60,  # run every 60s
         "jitter": 0.10,
         "next": 0.0,
+    },
+
+    {
+        "name": "metrics:smart",
+        "fn": collect_smart_once,
+        "interval": 6*3600,   # every 6 hours
+        "jitter": 0.10,
+        "timeout": 180,
+        "next": 0.0,
     }
 
 ]
 
 def _with_jitter(base, frac):
-    if not frac or frac <= 0: return base
+    if not frac or frac <= 0:
+        return base
     span = base * frac
     val = base + random.uniform(-span, span)
     return max(0.5 * base, val)
@@ -196,7 +209,11 @@ def run_handler_with_timeout(name, fn, timeout_sec):
         p.join(1)
         log.error(f"{name} TIMEOUT after {timeout_sec}...")
         return False
-    status, err = q.get_nowait()
+    try:
+        status, err = q.get_nowait()
+    except QueueEmpty:
+        log.error(f"{name} exited without status (crash?)")
+        return False
     if status == "ok":
         log.info(f"{name} OK...")
         return True
@@ -231,30 +248,38 @@ def main():
     handlers = [h for h in HANDLERS if (not only or h["name"] == only)]
 
     # initialize next-run with stagger
-    now = time.time()
+    now = monotonic()
     for h in handlers:
         h["next"] = now + random.uniform(0, _with_jitter(h["interval"], h["jitter"]))
 
     run_once = os.getenv("RUN_ONCE", "").lower() in ("1","true","yes","y")
-    idle_sleep = 0.5
+    IDLE_MIN = 0.05
+    IDLE_MAX = 2.0
 
     while not _SHUTDOWN:
-        now = time.time()
-        did_any = False
+        now = monotonic()
+        next_due = now + 3600.0  # far future
 
         for h in handlers:
             if now >= h["next"]:
-                did_any = True
+                # handlers must be single-pass (no inner while True)
                 run_handler_with_timeout(h["name"], h["fn"], h.get("timeout", 30))
-                h["next"] = time.time() + _with_jitter(h["interval"], h["jitter"])
+                h["next"] = monotonic() + _with_jitter(h["interval"], h["jitter"])
+
+            # track ealiest next run
+            if h["next"] < next_due:
+                next_due = h["next"]
+
         if run_once:
             break
-        if not did_any:
-            time.sleep(idle_sleep)
+        # sleep exactly until something is due (with clamps)
+        sleep_for = max(IDLE_MAX, min(IDLE_MIN, next_due - monotonic()))
+        time.sleep(sleep_for)
 
     log.info("orchestrator stopped. bye.")
 
 if __name__ == "__main__":
     main()
 
-# vagrant ssh web01 -- -N -L 5003:127.0.0.1:5000
+# vagrant ssh web01 -- -N -L 5000:127.0.0.1:5000
+# python3 -m flask --app gui.app run --debug --host 0.0.0.0 --port 5050

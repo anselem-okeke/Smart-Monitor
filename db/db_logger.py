@@ -235,9 +235,6 @@ def log_network_event(event):
             conn.close()
 
 
-
-
-
 # ---------------------------
 # Log system alert (anomaly, threshold breach)
 # ---------------------------
@@ -327,5 +324,48 @@ def create_swap_usage_column():
     finally:
         conn.commit()
         conn.close()
+
+# -------------------------------------
+#    SMART health
+# -------------------------------------
+def log_smart_health(entries):
+    """
+    Insert one or many SMART results.
+    Each entry: {
+      "hostname": str,
+      "device": str,             # e.g. /dev/sda or \\.\PHYSICALDRIVE0
+      "health": str,             # PASSED / FAILED / Unknown
+      "model": str | None,
+      "temp_c": float | None,
+      "output": str | None       # raw smartctl -H/-A snippet (optional)
+    }
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        rows = entries if isinstance(entries, list) else [entries]
+        cur.executemany("""
+            INSERT INTO smart_health
+              (timestamp, hostname, device, health, model, temp_c, output)
+            VALUES (CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)
+        """, [
+            (
+                r.get("hostname"),
+                r.get("device"),
+                r.get("health"),
+                r.get("model"),
+                r.get("temp_c"),
+                r.get("output"),
+            )
+            for r in rows
+        ])
+        conn.commit()
+    except Exception as e:
+        print(f"[ERROR] log_smart_health: {e}")
+    finally:
+        if conn:
+            conn.close()
+
 
 
