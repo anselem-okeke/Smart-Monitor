@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS process_status (
 CREATE TABLE IF NOT EXISTS service_status (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ts_epoch INTEGER GENERATED ALWAYS AS (CAST(strftime('%s', timestamp) AS INTEGER)) STORED,
     hostname TEXT NOT NULL,
     os_platform TEXT NOT NULL,
     service_name TEXT NOT NULL,
@@ -86,4 +87,16 @@ CREATE TABLE IF NOT EXISTS restart_attempts (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     hostname TEXT NOT NULL,
     service_name TEXT NOT NULL
-)
+);
+
+----Table to log SMART Health----
+CREATE TABLE IF NOT EXISTS smart_health (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hostname TEXT NOT NULL,
+    device TEXT NOT NULL,
+    health TEXT,
+    model   TEXT,
+    temp_c REAL,
+    output TEXT
+);

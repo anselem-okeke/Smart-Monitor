@@ -1,5 +1,8 @@
 {
   "include": [],
-  "exclude": ["/dev/sdc"]
+  "exclude": ["/dev/sdc"],
+  "driver_overrides": { "\\\\.\\PhysicalDrive0": "sat,auto" },
+  "temp_warn_c": 55,
+  "temp_crit_c": 65
 }
 

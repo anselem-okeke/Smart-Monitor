@@ -4,7 +4,7 @@ import platform
 import socket
 import sqlite3
 from datetime import  datetime, timedelta
-from db.core import DB_PATH
+from db.core import DB_PATH, connect_ro
 
 # CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
 # with open(CONFIG_PATH, "r") as f:
@@ -90,41 +90,105 @@ from db.core import DB_PATH
 #         if conn:
 #             conn.close()
 
+
+# def db_access_for_service_recovery():
+#     hostname = socket.gethostname()
+#     os_platform = platform.system()
+#     conn = None
+#     try:
+#         conn = sqlite3.connect(DB_PATH)
+#         cursor = conn.cursor()
+#
+#         cursor.execute(
+#             """
+#             SELECT service_name, normalized_status, hostname,
+#                    sub_state, service_type, unit_file_state, recoverable
+#             FROM service_status
+#             WHERE hostname     = ?
+#               AND os_platform  = ?
+#               AND timestamp = (
+#                   SELECT MAX(timestamp)
+#                   FROM service_status s2
+#                   WHERE s2.service_name = service_status.service_name
+#                     AND s2.hostname     = service_status.hostname
+#               )
+#             """,
+#             (hostname, os_platform)
+#         )
+#
+#         rows = cursor.fetchall()
+#         return rows
+#
+#     except Exception as e:
+#         print(f"[ERROR] Failed to fetch service status: {e}")
+#         return []
+#
+#     finally:
+#         if conn:
+#             conn.close()
+
 def db_access_for_service_recovery():
     hostname = socket.gethostname()
     os_platform = platform.system()
     conn = None
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        conn = connect_ro()  # your hardened RO connector
+        cur = conn.cursor()
 
-        cursor.execute(
+        # Detect ts_epoch
+        cols = {c[1] for c in cur.execute("PRAGMA table_info(service_status);").fetchall()}
+        use_epoch = "ts_epoch" in cols
+
+        if use_epoch:
+            sql = """
+            SELECT ss.service_name, ss.normalized_status, ss.hostname,
+                   ss.sub_state, ss.service_type, ss.unit_file_state,
+                   COALESCE(ss.recoverable,1) AS recoverable
+            FROM service_status ss
+            JOIN (
+                SELECT service_name, hostname, MAX(ts_epoch) AS max_ts
+                FROM service_status
+                WHERE hostname = ? AND os_platform = ?
+                GROUP BY service_name, hostname
+            ) m
+              ON m.service_name = ss.service_name
+             AND m.hostname     = ss.hostname
+             AND m.max_ts       = ss.ts_epoch
+            WHERE ss.hostname    = ?
+              AND ss.os_platform = ?
             """
-            SELECT service_name, normalized_status, hostname,
-                   sub_state, service_type, unit_file_state, recoverable
-            FROM service_status
-            WHERE hostname     = ?
-              AND os_platform  = ?
-              AND timestamp = (
-                  SELECT MAX(timestamp)
-                  FROM service_status s2
-                  WHERE s2.service_name = service_status.service_name
-                    AND s2.hostname     = service_status.hostname
-              )
-            """,
-            (hostname, os_platform)
-        )
+        else:
+            # Fallback using timestamp text; assumes ISO-8601 UTC strings
+            sql = """
+            SELECT ss.service_name, ss.normalized_status, ss.hostname,
+                   ss.sub_state, ss.service_type, ss.unit_file_state,
+                   COALESCE(ss.recoverable,1) AS recoverable
+            FROM service_status ss
+            JOIN (
+                SELECT service_name, hostname, MAX(timestamp) AS max_ts
+                FROM service_status
+                WHERE hostname = ? AND os_platform = ?
+                GROUP BY service_name, hostname
+            ) m
+              ON m.service_name = ss.service_name
+             AND m.hostname     = ss.hostname
+             AND m.max_ts       = ss.timestamp
+            WHERE ss.hostname    = ?
+              AND ss.os_platform = ?
+            """
 
-        rows = cursor.fetchall()
+        rows = cur.execute(sql, (hostname, os_platform, hostname, os_platform)).fetchall()
         return rows
 
     except Exception as e:
         print(f"[ERROR] Failed to fetch service status: {e}")
         return []
-
     finally:
         if conn:
             conn.close()
+
+
+
 
 def count_recent_restart_attempts(service_name, minutes=10):
     interval_limit = datetime.utcnow() - timedelta(minutes=minutes)

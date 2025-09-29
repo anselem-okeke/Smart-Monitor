@@ -1,0 +1,353 @@
+
+<script>
+(async function(){
+  const tBody  = document.querySelector('#targetsTable tbody');
+  const eBody  = document.querySelector('#eventsTable tbody');
+  const chartEl= document.getElementById('latencyChart').getContext('2d');
+  const title  = document.getElementById('chartTitle');
+  const traceBox = document.getElementById('traceBox');
+  const dnsBox   = document.getElementById('dnsBox');
+  const form  = document.getElementById('filterForm');
+  let chart = null, selected = { host:null, target:null };
+
+  function fmtLoss(x){ return (x==null||x==='') ? '—' : (Number(x).toFixed(1)+'%'); }
+  function fmtLat(x){ return (x==null||x==='') ? '—' : (Number(x).toFixed(1)+' ms'); }
+
+
+  function drawSeries(rows, target, host){
+    const ts  = rows.map(r => r.timestamp);
+    const lat = rows.map(r => r.latency_ms ?? null);
+    if (chart) chart.destroy();
+    chart = new Chart(chartEl, {
+      type:'line',
+      data:{ labels: ts, datasets:[{ label:`${host} → ${target}`, data: lat, pointRadius:0 }] },
+      options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ display:false } } }
+    });
+  }
+
+  async function loadTargets(){
+    const since = Number(new FormData(form).get('since_minutes') || 1440);
+    const res = await fetch(`/api/network/targets?since_minutes=${since}`);
+    const items = await res.json();
+    tBody.innerHTML = items.map(r => `
+      <tr data-host="${r.hostname}" data-target="${r.target}">
+        <td><a href="#" class="pick">${r.target}</a></td>
+        <td class="${r.status}">${r.status}</td>
+        <td>${fmtLat(r.latency_ms)}</td>
+        <td>${fmtLoss(r.packet_loss_percent)}</td>
+        <td>${r.timestamp}</td>
+        <td>${r.hostname}</td>
+        <td>${r.method}</td>
+      </tr>
+    `).join('');
+
+    tBody.querySelectorAll('a.pick').forEach(a => {
+      a.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const row = a.closest('tr');
+        selected.host   = row.dataset.host;
+        selected.target = row.dataset.target;
+        await loadSeries(selected, 60);
+        await loadLatestDetails(selected);
+      });
+    });
+  }
+
+  async function loadSeries(sel, minutes){
+    title.textContent = `Latency (last ${minutes}m) — ${sel.host} → ${sel.target}`;
+    const res = await fetch(`/api/network/series?target=${encodeURIComponent(sel.target)}&host=${encodeURIComponent(sel.host)}&since_minutes=${minutes}`);
+    const rows = await res.json();
+    drawSeries(rows, sel.target, sel.host);
+  }
+
+  async function loadLatestDetails(sel){
+    const res = await fetch(`/api/network/latest?target=${encodeURIComponent(sel.target)}&host=${encodeURIComponent(sel.host)}`);
+    const data = await res.json();
+    traceBox.textContent = data.traceroute ? `[${data.traceroute.status}] ${data.traceroute.timestamp}\n\n${data.traceroute.result}` : '—';
+    dnsBox.textContent   = data.nslookup   ? `[${data.nslookup.status}] ${data.nslookup.timestamp}\n\n${data.nslookup.result}`   : '—';
+  }
+
+  async function loadEvents(){
+    const fd = new FormData(form);
+    const params = new URLSearchParams();
+    for (const [k,v] of fd.entries()) if (v) params.append(k, v);
+    const res = await fetch('/api/network/events?' + params.toString());
+    const items = await res.json();
+    eBody.innerHTML = items.map(r => `
+      <tr>
+        <td>${r.timestamp}</td>
+        <td>${r.hostname}</td>
+        <td>${r.target}</td>
+        <td>${r.method}</td>
+        <td class="${r.status}">${r.status}</td>
+        <td>${fmtLat(r.latency_ms)}</td>
+        <td>${fmtLoss(r.packet_loss_percent)}</td>
+        <td class="nowrap">${(r.result || '').slice(0,120)}${(r.result||'').length>120?'…':''}</td>
+      </tr>
+    `).join('');
+  }
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    await loadTargets();
+    await loadEvents();
+    if (selected.host && selected.target) { await loadSeries(selected, 60); await loadLatestDetails(selected); }
+  });
+
+  // initial load
+  await loadTargets();
+  await loadEvents();
+})();
+</script>
+
+
+
+ function drawSeries(rows, target, host){
+    const haveLat = rows.some(r => r.latency_ms !== null && r.latency_ms !== undefined);
+    if (!haveLat){
+      if (chart) chart.destroy();
+      document.getElementById('latencyChart').replaceWith(
+        Object.assign(document.createElement('div'),{
+          id:'latencyChart',
+          className:'prebox',
+          textContent:`No latency samples for ${host} → ${target} in this window (no ping rows).`
+        })
+      );
+      return;
+    }
+    // ensure we have a canvas (in case we replaced it above)
+    let canvas = document.getElementById('latencyChart');
+    if (canvas.tagName !== 'CANVAS'){
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'latencyChart';
+      newCanvas.height = 200;
+      canvas.replaceWith(newCanvas);
+      canvas = newCanvas;
+    }
+    const ctx = canvas.getContext('2d');
+    const ts  = rows.map(r => r.timestamp);
+    const lat = rows.map(r => r.latency_ms ?? null);
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type:'line',
+      data:{ labels: ts, datasets:[{ label:`${host} → ${target}`, data: lat, pointRadius:0 }] },
+      options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ display:false } } }
+    });
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{% extends 'base.html' %}
+{% block content %}
+
+<h2>Network</h2>
+
+<form id="filterForm" class="filters" style="margin:8px 0;">
+  <input name="host" placeholder="host (optional)" />
+  <input name="target" placeholder="target (optional, e.g. 8.8.8.8)" />
+  <input name="since_minutes" type="number" min="5" value="1440" />
+  <select name="method">
+    <option value="">Any method</option>
+    <option value="ping">ping</option>
+    <option value="traceroute">traceroute</option>
+    <option value="nslookup">nslookup</option>
+  </select>
+  <button type="submit">Apply</button>
+</form>
+
+<div class="grid">
+  <div>
+    <h3>Targets</h3>
+    <table class="table" id="targetsTable">
+      <thead>
+        <tr><th>Target</th><th>Status</th><th>Latency</th><th>Loss</th><th>When</th><th>Host</th><th>Method</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div>
+    <h3 id="chartTitle">Latency (select a target)</h3>
+    <div id="chartWrap" class="panel-chart">
+       <canvas id="latencyChart" height="200"></canvas>
+       <div id="noData" class="empty hidden">No latency samples (select a ping target)</div>
+    </div>
+
+
+   <details style="margin-top:12px;">
+      <summary><strong>Latest traceroute</strong> / <strong>nslookup</strong> (selected target)</summary>
+      <pre id="traceBox" class="prebox">—</pre>
+      <pre id="dnsBox" class="prebox">—</pre>
+   </details>
+  </div>
+</div>
+
+<h3 style="margin-top:14px;">Recent Events</h3>
+<table class="table" id="eventsTable">
+  <thead><tr>
+    <th>Time</th><th>Host</th><th>Target</th><th>Method</th>
+    <th>Status</th><th>Latency</th><th>Loss</th><th>Result</th>
+  </tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+(async function(){
+  const tBody  = document.querySelector('#targetsTable tbody');
+  const eBody  = document.querySelector('#eventsTable tbody');
+  const chartEl= document.getElementById('latencyChart').getContext('2d');
+  const title  = document.getElementById('chartTitle');
+  const traceBox = document.getElementById('traceBox');
+  const dnsBox   = document.getElementById('dnsBox');
+  const form  = document.getElementById('filterForm');
+  let chart = null, selected = { host:null, target:null };
+
+  function fmtLoss(x){ return (x==null||x==='') ? '—' : (Number(x).toFixed(1)+'%'); }
+  function fmtLat(x){ return (x==null||x==='') ? '—' : (Number(x).toFixed(1)+' ms'); }
+
+  function drawSeries(rows, target, host){
+    rows = (rows || []).filter(r => r.method === 'ping' && r.latency_ms != null);
+
+    const empty = document.getElementById('noData');
+    if (chart) { chart.destroy(); chart = null; }
+
+    if (!rows.length){
+      empty.classList.remove('hidden');   // show overlay
+      return;
+    }
+    empty.classList.add('hidden');        // hide overlay
+
+    rows.sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
+    const ts  = rows.map(r => r.timestamp);
+    const lat = rows.map(r => Number(r.latency_ms));
+
+    chart = new Chart(chartEl, {
+      type:'line',
+      data:{ labels: ts, datasets:[{
+        label:`${host} → ${target}`,
+        data: lat,
+        pointRadius: 3,         // dots make sparse data visible
+        spanGaps: true
+      }]},
+      options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ display:false } } }
+    });
+  }
+
+
+  async function loadTargets(){
+    const since = Number(new FormData(form).get('since_minutes') || 1440);
+    const res = await fetch(`/api/network/targets?since_minutes=${since}`);
+    const items = await res.json();
+    tBody.innerHTML = items.map(r => `
+      <tr data-host="${r.hostname}" data-target="${r.target}">
+        <td><a href="#" class="pick">${r.target}</a></td>
+        <td class="${r.status}">${r.status}</td>
+        <td>${fmtLat(r.latency_ms)}</td>
+        <td>${fmtLoss(r.packet_loss_percent)}</td>
+        <td>${r.timestamp}</td>
+        <td>${r.hostname}</td>
+        <td>${r.method}</td>
+      </tr>
+    `).join('');
+
+    tBody.querySelectorAll('a.pick').forEach(a => {
+      a.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const row = a.closest('tr');
+        selected.host   = row.dataset.host;
+        selected.target = row.dataset.target;
+        await loadSeries(selected, 60);
+        await loadLatestDetails(selected);
+      });
+    });
+  }
+
+  async function loadSeries(sel, minutes){
+    title.textContent = `Latency (last ${minutes}m) — ${sel.host} → ${sel.target}`;
+    const res = await fetch(`/api/network/series?target=${encodeURIComponent(sel.target)}&host=${encodeURIComponent(sel.host)}&since_minutes=${minutes}`);
+    const rows = await res.json();
+    drawSeries(rows, sel.target, sel.host);
+  }
+
+  async function loadLatestDetails(sel){
+    const res = await fetch(`/api/network/latest?target=${encodeURIComponent(sel.target)}&host=${encodeURIComponent(sel.host)}`);
+    const data = await res.json();
+    traceBox.textContent = data.traceroute ? `[${data.traceroute.status}] ${data.traceroute.timestamp}\n\n${data.traceroute.result}` : '—';
+    dnsBox.textContent   = data.nslookup   ? `[${data.nslookup.status}] ${data.nslookup.timestamp}\n\n${data.nslookup.result}`   : '—';
+  }
+
+  async function loadEvents(){
+    const fd = new FormData(form);
+    const params = new URLSearchParams();
+    for (const [k,v] of fd.entries()) if (v) params.append(k, v);
+    const res = await fetch('/api/network/events?' + params.toString());
+    const items = await res.json();
+    eBody.innerHTML = items.map(r => `
+      <tr>
+        <td>${r.timestamp}</td>
+        <td>${r.hostname}</td>
+        <td>${r.target}</td>
+        <td>${r.method}</td>
+        <td class="${r.status}">${r.status}</td>
+        <td>${fmtLat(r.latency_ms)}</td>
+        <td>${fmtLoss(r.packet_loss_percent)}</td>
+        <td class="nowrap">${(r.result || '').slice(0,120)}${(r.result||'').length>120?'…':''}</td>
+      </tr>
+    `).join('');
+  }
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    await loadTargets();
+    await loadEvents();
+    if (selected.host && selected.target) { await loadSeries(selected, 60); await loadLatestDetails(selected); }
+  });
+
+  // initial load
+  await loadTargets();
+  await loadEvents();
+})();
+</script>
+
+
+<style>
+.grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.prebox{ background:#0f1723; color:#cfe3ff; padding:10px; border-radius:8px; white-space:pre-wrap; }
+.nowrap{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:520px;}
+@media (max-width:980px){ .grid{ grid-template-columns:1fr; } }
+
+.panel-chart{ position:relative; background:var(--panel); border-radius:12px; padding:8px; height:260px; }
+.panel-chart canvas{ width:100%; height:100%; display:block; }
+.empty{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; opacity:.7; pointer-events:none; }
+.hidden{ display:none; }
+
+</style>
+
+{% endblock %}
+

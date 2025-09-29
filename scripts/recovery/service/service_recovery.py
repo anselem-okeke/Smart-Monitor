@@ -130,9 +130,10 @@
 #
 #     except KeyboardInterrupt:
 #         print("[INFO] Service Recovery stopped by user.")
-
-
+import argparse
 import os, sys
+import shutil
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
@@ -153,110 +154,155 @@ from utils.log_utils import log_unclassified_service
 # Constants
 MAX_RESTART_ATTEMPTS = 3
 RESTART_INTERVAL_MINUTES = 10
-BACKOFF_BASE_WAIT_SECONDS = 5
+BACKOFF_BASE_WAIT_SECONDS = 2
+MAX_BACKOFF_SECONDS = 8  # cap
 
-def restart_service_windows(service_name):
-    """Restart a Windows service safely using sc.exe (PowerShell‐safe)."""
+
+def restart_service_windows(service_name: str, timeout_s: int = 25):
     try:
-        start_result = subprocess.run(["sc.exe", "start", service_name], capture_output=True, text=True)
-        if "Access is denied" in start_result.stderr:
+        # Stop (don’t fail if already stopped); cap time spent
+        subprocess.run(["sc.exe", "stop", service_name],
+                       capture_output=True, text=True, timeout=10)
+
+        # Start with bounded time
+        start = subprocess.run(["sc.exe", "start", service_name],
+                               capture_output=True, text=True, timeout=10)
+        if "Access is denied" in (start.stderr or ""):
             return False, "Access denied: Run as Administrator."
 
-        result = subprocess.run(["sc.exe", "query", service_name], capture_output=True, text=True)
-        if result.returncode != 0:
-            return False, result.stderr.strip()
+        # Poll RUNNING state with an overall timeout
+        deadline = time.time() + timeout_s
+        last = None
+        while time.time() < deadline:
+            q = subprocess.run(["sc.exe", "query", service_name],
+                               capture_output=True, text=True, timeout=5)
+            last = q.stdout
+            line = next((l for l in last.splitlines() if "STATE" in l), "")
+            if "RUNNING" in line:
+                return True, last
+            if "STOPPED" in line:
+                break
+            time.sleep(1)
 
-        for line in result.stdout.splitlines():
-            if "STATE" in line and "RUNNING" in line:
-                return True, result.stdout.strip()
-        return False, result.stdout.strip()
-    except Exception as e:
-        return False, str(e)
-
-def restart_service_linux(service_name: str):
-    """Restart a systemd service on Linux via safe wrapper (no password prompts)."""
-    try:
-        result = subprocess.run(
-            ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
-            capture_output=True, text=True
-        )
-        if result.returncode == 0:
-            return True, result.stdout.strip() or f"{service_name} restarted successfully"
-        return False, result.stderr.strip() or f"Failed to restart {service_name}"
+        return False, last or "Service didn’t reach RUNNING before timeout"
+    except subprocess.TimeoutExpired:
+        return False, "sc.exe timed out"
     except Exception as e:
         return False, str(e)
 
 
-# def restart_service_linux(service_name):
-#     """Restart a systemd service on Linux."""
+# def restart_service_windows(service_name):
+#     """Restart a Windows service safely using sc.exe (PowerShell‐safe)."""
 #     try:
-#         result = subprocess.run(["sudo", "systemctl", "restart", service_name], capture_output=True, text=True)
-#         if result.returncode == 0:
-#             return True, result.stdout.strip()
-#         return False, result.stderr.strip()
+#         start_result = subprocess.run(["sc.exe", "start", service_name], capture_output=True, text=True)
+#         if "Access is denied" in start_result.stderr:
+#             return False, "Access denied: Run as Administrator."
+#
+#         result = subprocess.run(["sc.exe", "query", service_name], capture_output=True, text=True)
+#         if result.returncode != 0:
+#             return False, result.stderr.strip()
+#
+#         for line in result.stdout.splitlines():
+#             if "STATE" in line and "RUNNING" in line:
+#                 return True, result.stdout.strip()
+#         return False, result.stdout.strip()
+#     except Exception as e:
+#         return False, str(e)
+
+# def restart_service_linux(service_name: str, timeout_s: int = 20):
+#     try:
+#         # Don’t block on restart; we’ll poll
+#         subprocess.run(["systemctl", "reset-failed", service_name],
+#                        capture_output=True, text=True, timeout=5)
+#         subprocess.run(["systemctl", "restart", "--no-block", service_name],
+#                        capture_output=True, text=True, timeout=5)
+#
+#         # Poll ActiveState with an overall timeout
+#         deadline = time.time() + timeout_s
+#         last = None
+#         while time.time() < deadline:
+#             q = subprocess.run(["systemctl", "is-active", service_name],
+#                                capture_output=True, text=True, timeout=5)
+#             state = (q.stdout or "").strip()
+#             if state == "active":
+#                 return True, "active"
+#             if state in ("failed", "inactive"):
+#                 break
+#             time.sleep(1)
+#
+#         # Grab a short journal tail to explain failure
+#         j = subprocess.run(["journalctl", "-u", service_name, "-n", "20", "--no-pager"],
+#                            capture_output=True, text=True, timeout=5)
+#         return False, (j.stdout or "Service didn’t reach active before timeout")[-2000:]
+#     except subprocess.TimeoutExpired:
+#         return False, "systemctl timed out"
 #     except Exception as e:
 #         return False, str(e)
 
 
+def restart_service_linux(service_name: str, timeout_s: int = 20):
+    WRAPPER = "/usr/local/bin/smartmon-restart-service"
+    unit = service_name if service_name.endswith(".service") else f"{service_name}.service"
 
+    # If we're root, don't use sudo or the wrapper—just call systemctl directly.
+    if os.geteuid() == 0:
+        cmd = ["/bin/systemctl", "restart", unit]
+        check = ["/bin/systemctl", "is-active", "--quiet", unit]
+    else:
+        if shutil.which(WRAPPER):
+            cmd = ["sudo", "-n", WRAPPER, unit]
+            check = ["sudo", "-n", "/bin/systemctl", "is-active", "--quiet", unit]
+        else:
+            # Fallback: try sudo systemctl directly (requires sudoers permission)
+            cmd = ["sudo", "-n", "/bin/systemctl", "restart", unit]
+            check = ["sudo", "-n", "/bin/systemctl", "is-active", "--quiet", unit]
 
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
+        if r.returncode != 0:
+            msg = (r.stderr or r.stdout or "restart failed").strip()
+            if "a password is required" in msg.lower():
+                msg = "sudo needs a password (add NOPASSWD or run orchestrator as root)."
+            if "command not found" in msg.lower() and WRAPPER in " ".join(cmd):
+                msg = f"wrapper missing on host: {WRAPPER}"
+            return False, msg
 
-# @lru_cache(maxsize=512)
-# def restart_candidate_linux(unit: str, norm_status: str) -> bool:
-#     """
-#     Return True only for daemons we expect to stay up and whose
-#     normalised status says 'stopped' or 'failed'.
-#     """
-#     if norm_status not in {"stopped", "failed"}:
-#         return False                       # still running / oneshot completed
-#
-#     show = subprocess.run(
-#         ["systemctl", "show", unit,
-#          "--property=Type,UnitFileState,SubState", "--value", "--no-pager"],
-#         capture_output=True, text=True
-#     )
-#     if show.returncode:
-#         return False                       # unknown unit – be safe, skip
-#
-#     unit_type, enabled_state, sub_state = (
-#         show.stdout.strip().splitlines() + ["", "", ""])[:3]
-#
-#     return (
-#         enabled_state == "enabled" and
-#         unit_type.lower() in {"simple", "forking"} and
-#         sub_state in {"dead", "failed", "auto-restart"}
-#     )
+        # verify it came back up
+        rc = subprocess.run(check, capture_output=True, text=True, timeout=5).returncode
+        return (rc == 0), ("restart requested" if rc == 0 else "service not active after restart")
+    except subprocess.TimeoutExpired:
+        return False, "restart timed out"
+    except Exception as e:
+        return False, str(e)
 
+def restart_service_linux(service_name: str, timeout_s: int = 20):
+    try:
+        # DO NOT call "systemctl reset-failed" here
+        r = subprocess.run(
+            ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
+            capture_output=True, text=True, timeout=10
+        )
+        if r.returncode != 0:
+            return False, r.stderr.strip() or "Restart failed"
+        # (poll is-active for up to timeout_s if you want)
+        return True, "restart requested"
+    except subprocess.TimeoutExpired:
+        return False, "systemctl timed out"
+    except Exception as e:
+        return False, str(e)
 
-
-# @lru_cache(maxsize=256)
-# def restart_candidate_linux(unit: str, norm_status: str) -> bool:
-#     if norm_status not in {"stopped", "failed"}:
-#         return False
-#
-#     show = subprocess.run(
-#         ["systemctl", "show", unit,
-#          "--property=Type,UnitFileState,SubState",
-#          "--no-pager"],
-#         capture_output=True, text=True
-#     )
-#     if show.returncode:
-#         return False            # unknown unit → skip
-#
-#     if "Type=oneshot" in show.stdout:
-#         return False            # completed helper → never restart
-#
-#     props = {}
-#     for line in show.stdout.splitlines():
-#         if "=" in line:
-#             k, v = line.split("=", 1)
-#             props[k] = v.lower()
-#
-#     return (
-#         props.get("UnitFileState") == "enabled" and
-#         props.get("Type") in {"simple", "forking"} and
-#         props.get("SubState") in {"dead", "failed", "auto-restart"}
-#     )
+# def restart_service_linux(service_name: str):
+#     """Restart a systemd service on Linux via safe wrapper (no password prompts)."""
+#     try:
+#         result = subprocess.run(
+#             ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
+#             capture_output=True, text=True
+#         )
+#         if result.returncode == 0:
+#             return True, result.stdout.strip() or f"{service_name} restarted successfully"
+#         return False, result.stderr.strip() or f"Failed to restart {service_name}"
+#     except Exception as e:
+#         return False, str(e)
 
 def is_passive_or_oneshot_service(service_name):
     """Detects services that are timer-triggered, oneshot, or auto-dead after success."""
@@ -310,9 +356,14 @@ def attempt_service_recovery():
             return  # process only one service per run
 
         # --- exponential back‑off ----------------------------------------
+        # if recent_attempts > 0:
+        #     wait_time = BACKOFF_BASE_WAIT_SECONDS * (2 ** (recent_attempts - 1))
+        #     print(f"[INFO] Waiting {wait_time}s before retrying {service_name}")
+        #     time.sleep(wait_time)
+
         if recent_attempts > 0:
-            wait_time = BACKOFF_BASE_WAIT_SECONDS * (2 ** (recent_attempts - 1))
-            print(f"[INFO] Waiting {wait_time}s before retrying {service_name}")
+            wait_time = min(BACKOFF_BASE_WAIT_SECONDS * (2 ** (recent_attempts - 1)), MAX_BACKOFF_SECONDS)
+            print(f"[INFO] Backoff {wait_time}s for {service_name} (attempts={recent_attempts})", flush=True)
             time.sleep(wait_time)
 
         print(f"[INFO] Attempting to restart {service_name} on {hostname}")
@@ -365,18 +416,35 @@ def handle_service_recovery():
         # wait before next service check
     print("[INFO] Sleeping 60s …")
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--once", action="store_true", help="Process one recovery sweep and exit")
+    args = parser.parse_args()
+
+    print("[INFO] Starting Service Recovery …", flush=True)
+    try:
+        if args.once:
+            handle_service_recovery()
+        else:
+            while True:
+                handle_service_recovery()
+                time.sleep(60)
+    except KeyboardInterrupt:
+        print("[INFO] Service Recovery stopped by user.")
+
 
 # -------------------------
 # Main scheduler loop
 # -------------------------
 if __name__ == "__main__":
-    print("[INFO] Starting Service Recovery …")
-    try:
-        while True:
-            handle_service_recovery()
-            time.sleep(60)
-    except KeyboardInterrupt:
-        print("[INFO] Service Recovery stopped by user.")
+    main()
+    # print("[INFO] Starting Service Recovery …")
+    # try:
+    #     while True:
+    #         handle_service_recovery()
+    #         time.sleep(60)
+    # except KeyboardInterrupt:
+    #     print("[INFO] Service Recovery stopped by user.")
 
 
 
