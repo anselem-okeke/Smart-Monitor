@@ -177,7 +177,7 @@ HANDLERS = [
     {
         "name": "metrics:smart",
         "fn": collect_smart_once,
-        "interval": 6*3600,   # every 6 hours
+        "interval": 6*3600,   # every 6 hours 6*3600
         "jitter": 0.10,
         "timeout": 180,
         "next": 0.0,

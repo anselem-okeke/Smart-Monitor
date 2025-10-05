@@ -1,10 +1,257 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'base.html' %}
+{% block content %}
 
-</body>
-</html>
+<h2>Disk &amp; SMART</h2>
+
+<form id="smartFilter" class="filters" style="margin:8px 0;">
+  <select name="host" id="hostSel">
+    <option value="">All hosts</option>
+    {% for h in hosts %}
+      <option value="{{ h }}" {% if h == host %}selected{% endif %}>{{ h }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Apply</button>
+</form>
+
+<div id="smartContainer"></div>
+
+<script>
+(() => {
+  const hostSel = document.getElementById('hostSel');
+  const form    = document.getElementById('smartFilter');
+  const wrap    = document.getElementById('smartContainer');
+  let renderToken = 0;
+
+  const badge = (health) => {
+    if (!health) return '<span class="badge">—</span>';
+    const h = String(health).toUpperCase();
+    const cls = (h === 'PASSED') ? 'success' : (h === 'FAILED' ? 'critical' : 'dim');
+    return `<span class="badge ${cls}">${h}</span>`;
+  };
+
+  const chip = (pct) => {
+    if (pct == null || isNaN(pct)) return '<span class="chip muted">n/a</span>';
+    const p = Number(pct);
+    if (p >= 95) return `<span class="chip danger">${p.toFixed(1)}%</span>`;
+    if (p >= 80) return `<span class="chip warn">${p.toFixed(1)}%</span>`;
+    return `<span class="chip ok">${p.toFixed(1)}%</span>`;
+  };
+
+  const section = (host) => `
+    <section class="card">
+      <div class="card-head"><h3>${host}</h3></div>
+      <div class="card-body">
+        <div class="grid">
+          <div>
+            <h4>Devices</h4>
+            <table class="table">
+              <thead>
+                <tr><th>Device</th><th>Health</th><th>Model</th><th>Temp</th><th>Checked</th></tr>
+              </thead>
+              <tbody id="tb-${host}"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+          <div>
+            <div class="subhead">Disk % <span id="disk-badge-${host}" class="chip muted">…</span></div>
+            <div class="panel-chart"><canvas id="disk-${host}"></canvas></div>
+
+            <div class="subhead" style="margin-top:10px;">Inode % <span id="inode-badge-${host}" class="chip muted">…</span></div>
+            <div class="panel-chart"><canvas id="inode-${host}"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+
+  async function loadSMART(host){
+    const url = new URL('/api/smart', location.origin);
+    if (host) url.searchParams.set('host', host);
+    const items = await fetch(url).then(r => r.json());
+    const map = new Map();
+    for (const it of items) {
+      if (!map.has(it.hostname)) map.set(it.hostname, []);
+      map.get(it.hostname).push(it);
+    }
+    if (host && !map.has(host)) map.set(host, []);
+    return map;
+  }
+
+  async function loadMetrics(host){
+    const url = `/api/hosts/${encodeURIComponent(host)}/metrics?minutes=1440`;
+    return await fetch(url).then(r => r.json());
+  }
+
+  function drawLine(canvasId, label, xs, ys, warn = 80, crit = 95){
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const ctx = el.getContext('2d');
+
+    // make canvas fill its wrapper (height is set in CSS)
+    el.width  = el.clientWidth;
+    el.height = el.clientHeight;
+
+    // 1) numeric data, allow gaps
+    const Y = ys.map(v => (v == null || v === '') ? null : Number(v));
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: xs,
+        datasets: [
+          {
+            label,
+            data: Y,
+            pointRadius: 0,
+            spanGaps: true,
+            tension: 0.25,
+            borderWidth: 2,
+            borderColor: '#60a5fa',      // bright blue (visible on dark bg)
+            backgroundColor: '#60a5fa',
+            order: 0                      // draw on top of thresholds
+          },
+          {
+            label: `Warn ${warn}%`,
+            data: xs.map(() => warn),
+            pointRadius: 0,
+            borderDash: [6,4],
+            borderWidth: 1,
+            borderColor: '#f59e0b',      // amber
+            backgroundColor: '#f59e0b',
+            order: 1
+          },
+          {
+            label: `Crit ${crit}%`,
+            data: xs.map(() => crit),
+            pointRadius: 0,
+            borderDash: [3,3],
+            borderWidth: 1,
+            borderColor: '#ef4444',      // red
+            backgroundColor: '#ef4444',
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: { y: { suggestedMin: 0, suggestedMax: 100 }, x: { display: false } },
+        plugins: {
+          legend: {
+            labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text') || '#e5e7eb' }
+          }
+        }
+      }
+    });
+  }
+
+<!--  function drawLine(canvasId, label, xs, ys, warn=80, crit=95){-->
+<!--    const el = document.getElementById(canvasId);-->
+<!--    if (!el) return;-->
+<!--    const ctx = el.getContext('2d');-->
+<!--    el.width  = el.clientWidth;-->
+<!--    el.height = el.clientHeight;-->
+
+<!--    new Chart(ctx, {-->
+<!--      type: 'line',-->
+<!--      data: {-->
+<!--        labels: xs,-->
+<!--        datasets: [-->
+<!--          { label, data: ys, pointRadius: 0, borderWidth: 2 },-->
+<!--          { label: `Warn ${warn}%`, data: xs.map(()=>warn), pointRadius:0, borderDash:[6,4], borderWidth:1 },-->
+<!--          { label: `Crit ${crit}%`, data: xs.map(()=>crit), pointRadius:0, borderDash:[3,3], borderWidth:1 },-->
+<!--        ]-->
+<!--      },-->
+<!--      options: {-->
+<!--        responsive: true, maintainAspectRatio: false, animation: false,-->
+<!--        scales: { y: { suggestedMin: 0, suggestedMax: 100 }, x: { display:false } },-->
+<!--        plugins: { legend: { display: true } }-->
+<!--      }-->
+<!--    });-->
+<!--  }-->
+
+  async function render(){
+    const myToken = ++renderToken;
+    const host = hostSel.value.trim();
+    wrap.innerHTML = '';
+
+    const smap = await loadSMART(host);
+    if (myToken !== renderToken) return;
+
+    const hosts = smap.size ? [...smap.keys()] : (host ? [host] : []);
+    for (const h of hosts){
+      wrap.insertAdjacentHTML('beforeend', section(h));
+
+      // SMART table
+      const tbody = document.getElementById(`tb-${h}`);
+      const rows = smap.get(h) || [];
+      tbody.innerHTML = rows.length
+        ? rows.map(r => `
+            <tr>
+              <td>${r.device}</td>
+              <td>${badge(r.health)}</td>
+              <td>${r.model || '—'}</td>
+              <td>${(r.temp_c != null) ? (r.temp_c + ' °C') : '—'}</td>
+              <td>${r.timestamp}</td>
+            </tr>
+          `).join('')
+        : `<tr><td colspan="5" class="muted">No SMART data yet</td></tr>`;
+
+      // Metrics → charts + badges
+      try {
+        const m = await loadMetrics(h);
+        if (myToken !== renderToken) return;
+        const ts    = m.map(x => x.timestamp);
+        const disk  = m.map(x => x.disk_usage);
+        const inode = m.map(x => x.inode_usage);
+
+        drawLine(`disk-${h}`,  'Disk %',  ts, disk);
+        drawLine(`inode-${h}`, 'Inode %', ts, inode);
+
+        // latest badges
+        const lastDisk  = disk.length  ? disk[disk.length-1]   : null;
+        const lastInode = inode.length ? inode[inode.length-1] : null;
+        document.getElementById(`disk-badge-${h}`).outerHTML  = chip(lastDisk);
+        document.getElementById(`inode-badge-${h}`).outerHTML = chip(lastInode);
+      } catch {
+        document.getElementById(`disk-${h}`)?.parentElement?.replaceWith(
+          Object.assign(document.createElement('div'), { className:'panel-chart muted center', textContent:'No metrics' })
+        );
+        document.getElementById(`inode-${h}`)?.parentElement?.replaceWith(
+          Object.assign(document.createElement('div'), { className:'panel-chart muted center', textContent:'No metrics' })
+        );
+      }
+    }
+  }
+
+  form.addEventListener('submit', (e) => { e.preventDefault(); render(); });
+  render(); // initial
+})();
+</script>
+
+<style>
+/* Stable chart containers */
+.panel-chart { position: relative; height: 260px; background: var(--panel); border-radius: 12px; padding: 8px; }
+.panel-chart canvas { position: absolute; inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); display:block; border-radius: 8px; }
+.center { display:flex; align-items:center; justify-content:center; }
+
+/* Chips + headings */
+.subhead{ margin:6px 0 6px; opacity:.95 }
+.chip{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:.9em }
+.chip.ok{ background:#16361f; color:#a9efc5 }
+.chip.warn{ background:#3a2e14; color:#ffd38a }
+.chip.danger{ background:#3a1414; color:#ffb3b3 }
+.chip.muted{ background:#2a3346; color:#a9b4c5 }
+
+/* Card/layout polish */
+.card { background:#0b1320; border-radius:12px; padding:12px; margin:10px 0; }
+.card-head h3 { margin:0 0 8px 0; }
+.grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; align-items:start; }
+@media (max-width: 980px){ .grid { grid-template-columns: 1fr; } }
+.badge.dim { background:#2a3346; color:#a9b4c5; }
+.muted { color: var(--muted); }
+</style>
+
+{% endblock %}
+
+

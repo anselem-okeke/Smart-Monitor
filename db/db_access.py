@@ -207,26 +207,20 @@ def count_recent_restart_attempts(service_name, minutes=10):
     conn.close()
     return count
 
-def mark_service_running(service_name, hostname, platform_name):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT INTO service_status (
-            timestamp,
-            hostname,
-            os_platform,
-            service_name,
-            raw_status,
-            normalized_status
-        )
-        VALUES (CURRENT_TIMESTAMP, ?, ?, ?, 'running', 'active')
-    """,
-        (service_name, hostname, platform_name),
-    )
-    conn.commit()
-    conn.close()
+def mark_service_running(service_name, hostname, os_platform):
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("""
+           INSERT INTO service_status (
+               timestamp, hostname, os_platform, service_name,
+               raw_status, normalized_status, sub_state, service_type, unit_file_state, recoverable
+           ) VALUES (
+               CURRENT_TIMESTAMP, :hostname, :os_platform, :service_name,
+               'running', 'active', 'running', NULL, NULL, 1
+           )
+       """, {"hostname": hostname, "os_platform": os_platform, "service_name": service_name})
+    con.commit()
+    con.close()
 
 def recent_failed_network_events(host, minutes=5):
     """Return all rows with status != 'success' in the last N minutes."""

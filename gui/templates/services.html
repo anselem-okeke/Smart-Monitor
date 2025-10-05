@@ -1,10 +1,153 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'base.html' %}
+{% block content %}
 
-</body>
-</html>
+<h2>Services</h2>
+
+<form id="svcFilters" class="filters" style="margin:8px 0">
+  <input name="host" placeholder="host (optional)">
+  <select name="status">
+    <option value="">any status</option>
+    <option value="active">active (running)</option>
+    <option value="stopped">stopped</option>
+    <option value="failed">failed</option>
+  </select>
+  <input name="since_minutes" type="number" min="5" value="1440" title="lookback minutes">
+  <input name="limit" type="number" min="1" max="1000" value="200" title="rows per page">
+  <button type="submit">Apply</button>
+  <a id="csvLink" class="btn" href="#">Export CSV</a>
+</form>
+
+<div style="margin:6px 0">
+  <button id="prevBtn" disabled>Prev</button>
+  <span id="pageInfo">0–0</span>
+  <button id="nextBtn" disabled>Next</button>
+</div>
+
+<table class="table" id="svcTable">
+  <thead>
+    <tr>
+      <th>Host</th>
+      <th>Service</th>
+      <th>Status</th>
+      <th>Sub-state</th>
+      <th>Unit file</th>
+      <th>Recoverable</th>
+      <th>Updated</th>
+      <th>Last recovery</th>
+      <th>Backoff</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+(async function(){
+  const form = document.getElementById('svcFilters');
+  const tbody = document.querySelector('#svcTable tbody');
+  const pageInfo = document.getElementById('pageInfo');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const csvLink = document.getElementById('csvLink');
+
+  let offset = 0, total = 0, limit = 200, lastQuery = '';
+
+  function badge(cls, text){ return `<span class="badge ${cls}">${text}</span>`; }
+  function yn(x){ return x ? 'yes' : 'no'; }
+
+  function qs() {
+    const fd = new FormData(form);
+    const p = new URLSearchParams();
+    for (const [k,v] of fd.entries()){ if(v) p.append(k, v); }
+    p.append('offset', offset);
+    return p.toString();
+  }
+
+  async function load() {
+    limit = parseInt(form.limit.value || '200', 10);
+    lastQuery = qs();
+
+    const res = await fetch('/api/services?' + lastQuery);
+    const j = await res.json();
+    total = j.total;
+
+    tbody.innerHTML = j.items.map(r => {
+      const statusClass = (r.status==='failed' || r.status==='stopped') ? 'critical' : 'success';
+      const backoff = (r.recent_failures >= 3) ? badge('warning','backoff') : '';
+      const svcUrl = `/services/${encodeURIComponent(r.host)}/${encodeURIComponent(r.service_name)}`;
+
+      return `<tr>
+        <td>${r.host}</td>
+        <td class="nowrap"><a href="${svcUrl}" target="_blank">${r.service_name}</a></td>
+        <td class="${statusClass}">${r.status}</td>
+        <td>${r.sub_state || ''}</td>
+        <td>${r.unit_file_state || ''}</td>
+        <td>${yn(r.recoverable)}</td>
+        <td>${r.updated || ''}</td>
+        <td>${r.last_recovery_result || ''} ${r.last_recovery_at ? '('+r.last_recovery_at+')' : ''}</td>
+        <td>${backoff}</td>
+      </tr>`;
+    }).join('');
+
+    const from = Math.min(total, offset+1);
+    const to   = Math.min(total, offset + j.items.length);
+    pageInfo.textContent = `${from}-${to} of ${total}`;
+    prevBtn.disabled = (offset<=0);
+    nextBtn.disabled = (offset + limit >= total);
+
+    // CSV link
+    const csvParams = new URLSearchParams(new FormData(form));
+    csvLink.href = '/api/services.csv?' + csvParams.toString();
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    offset = 0;
+    load();
+  });
+  prevBtn.addEventListener('click', ()=>{ offset = Math.max(0, offset - limit); load(); });
+  nextBtn.addEventListener('click', ()=>{ offset = offset + limit; load(); });
+
+  // initial
+  load();
+
+  // minimal client-side sortable headers
+  (function(){ // tiny sorter
+    const table = document.getElementById('svcTable');
+    const head  = table.querySelector('thead');
+    let sortState = { col: 0, dir: 1 };
+    function cellText(td){ return (td?.innerText || td?.textContent || '').trim(); }
+    function cmp(a,b,dir){
+      const na = parseFloat(a), nb = parseFloat(b);
+      const bothNum = !isNaN(na) && !isNaN(nb);
+      if (bothNum) return dir*(na-nb);
+      return dir * a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'});
+    }
+    head.addEventListener('click', e=>{
+      const th = e.target.closest('th'); if(!th) return;
+      const idx = Array.from(th.parentNode.children).indexOf(th);
+      sortState.dir = (sortState.col===idx) ? -sortState.dir : 1;
+      sortState.col = idx;
+
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.rows);
+      rows.sort((r1,r2)=>{
+        const a = cellText(r1.cells[idx]);
+        const b = cellText(r2.cells[idx]);
+        return cmp(a,b,sortState.dir);
+      });
+      rows.forEach(r=>tbody.appendChild(r));
+    });
+  })();
+
+})();
+</script>
+
+<style>
+.nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
+.badge{padding:2px 6px;border-radius:6px;background:#223;display:inline-block}
+.badge.warning{background:#8a5a00;color:#fff}
+.success{color:#8bcf6a}
+.critical{color:#ff6b6b}
+</style>
+
+{% endblock %}

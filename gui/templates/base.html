@@ -11,7 +11,7 @@
   <!-- Chart.js first -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Your global app JS (keep if you have it) -->
+  <!-- global app JS (keep if not available) -->
   <script defer src="{{ url_for('ui.static', filename='js/app.js') }}"></script>
 
   <!-- Global Chart.js defaults to prevent aspect-ratio issues -->
@@ -33,6 +33,8 @@
       <a href="{{ url_for('ui.hosts_list') }}">All Hosts</a>
       <a href="{{ url_for('ui.alerts_view') }}">Alerts</a>
       <a href="{{ url_for('ui.network_view') }}">Network</a>
+       <a href="{{ url_for('ui.smart_view') }}">Smart</a>
+      <a href="{{ url_for('ui.services_view') }}">Services</a>
     </nav>
   </aside>
 
