@@ -274,22 +274,22 @@ def restart_service_linux(service_name: str, timeout_s: int = 20):
         return False, "restart timed out"
     except Exception as e:
         return False, str(e)
-
-def restart_service_linux(service_name: str, timeout_s: int = 20):
-    try:
-        # DO NOT call "systemctl reset-failed" here
-        r = subprocess.run(
-            ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
-            capture_output=True, text=True, timeout=10
-        )
-        if r.returncode != 0:
-            return False, r.stderr.strip() or "Restart failed"
-        # (poll is-active for up to timeout_s if you want)
-        return True, "restart requested"
-    except subprocess.TimeoutExpired:
-        return False, "systemctl timed out"
-    except Exception as e:
-        return False, str(e)
+#
+# def restart_service_linux(service_name: str, timeout_s: int = 20):
+#     try:
+#         # DO NOT call "systemctl reset-failed" here
+#         r = subprocess.run(
+#             ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
+#             capture_output=True, text=True, timeout=10
+#         )
+#         if r.returncode != 0:
+#             return False, r.stderr.strip() or "Restart failed"
+#         # (poll is-active for up to timeout_s if you want)
+#         return True, "restart requested"
+#     except subprocess.TimeoutExpired:
+#         return False, "systemctl timed out"
+#     except Exception as e:
+#         return False, str(e)
 
 # def restart_service_linux(service_name: str):
 #     """Restart a systemd service on Linux via safe wrapper (no password prompts)."""

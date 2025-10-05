@@ -5,7 +5,9 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from db.core import resolve_db_path
+from typing import Optional
+
+from db.core import resolve_db_path, DB_PATH
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root (…/Smart-Factory-IT-Monitor)
 
@@ -721,7 +723,6 @@ def network_latency_series(target: str, since_minutes: int = 60, host: str = Non
         return cur.fetchall()
 
 
-
 # latest traceroute / nslookup for a (host, target)
 def latest_result_for(target: str, method: str, host: str = None):
     sql = """
@@ -738,6 +739,561 @@ def latest_result_for(target: str, method: str, host: str = None):
         cur = conn.cursor()
         cur.execute(sql, tuple(params))
         return cur.fetchone()
+
+def _smart_table_exists(cur) -> bool:
+    cur.execute("""SELECT name FROM sqlite_master
+                       WHERE type='table' AND name='smart_health'""")
+    return cur.fetchone() is not None
+
+def smart_latest(host: Optional[str] = None):
+    """
+    Return the latest SMART health per (hostname, device).
+    Expects table:
+      smart_health(id, timestamp, hostname, device, health, model, temp_c, output)
+    health examples: 'PASSED', 'FAILED', 'Unknown'
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    if not _smart_table_exists(cur):
+        conn.close()
+        return []  # graceful: no table yet
+
+    params = []
+    where = " WHERE 1=1 "
+    if host:
+        where += " AND hostname = ? "
+        params.append(host)
+
+    # latest row per host+device
+    sql = f"""
+      WITH latest AS (
+        SELECT hostname, device, MAX(timestamp) AS ts
+        FROM smart_health {where}
+        GROUP BY hostname, device
+      )
+      SELECT s.timestamp, s.hostname, s.device, s.health, s.model, s.temp_c
+      FROM smart_health s
+      JOIN latest L
+        ON s.hostname=L.hostname AND s.device=L.device AND s.timestamp=L.ts
+      ORDER BY s.hostname, s.device;
+    """
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+# -------improved version with connect_ro will be implemented later------
+# def smart_latest(host: str | None = None):
+#     where, params = " WHERE 1=1 ", []
+#     if host:
+#         where += " AND hostname = ? "; params.append(host)
+#
+#     sql = f"""
+#       WITH latest AS (
+#         SELECT hostname, device, MAX(timestamp) AS ts
+#         FROM smart_health {where}
+#         GROUP BY hostname, device
+#       )
+#       SELECT s.timestamp, s.hostname, s.device, s.health, s.model, s.temp_c
+#       FROM smart_health s
+#       JOIN latest L
+#         ON s.hostname=L.hostname AND s.device=L.device AND s.timestamp=L.ts
+#       ORDER BY s.hostname, s.device;
+#     """
+#     with connect_ro(dicts=True) as conn:
+#         return conn.execute(sql, params).fetchall()   # list[dict]
+
+
+def hosts_for_smart():
+    """Hosts that either have SMART rows or at least system_metrics (for charts)."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # Try smart_health first, fallback to system_metrics
+    cur.execute("""SELECT name FROM sqlite_master
+                   WHERE type='table' AND name='smart_health'""")
+    if cur.fetchone():
+        cur.execute("SELECT DISTINCT hostname FROM smart_health ORDER BY hostname")
+        hs = [r[0] for r in cur.fetchall()]
+        conn.close()
+        if hs:
+            return hs
+
+    cur.execute("SELECT DISTINCT hostname FROM system_metrics ORDER BY hostname")
+    hs = [r[0] for r in cur.fetchall()]
+    conn.close()
+    return hs
+
+# -------improved version with connect_ro will be implemented later------
+# def hosts_for_smart():
+#     with connect_ro() as conn:
+#         cur = conn.cursor()
+#         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='smart_health'")
+#         if cur.fetchone():
+#             return [r["hostname"] for r in conn.execute(
+#                 "SELECT DISTINCT hostname FROM smart_health ORDER BY hostname"
+#             )]
+#         return [r["hostname"] for r in conn.execute(
+#             "SELECT DISTINCT hostname FROM system_metrics ORDER BY hostname"
+#         )]
+
+
+
+
+
+
+# --- Services (fleet view) ----------------------------------------------------
+
+from typing import Optional, List, Dict, Any
+
+# --- internal ---------------------------------------------------------------
+
+def _services_query(
+    windowed: bool,
+    host: Optional[str],
+    status: Optional[str],
+    since_minutes: int,
+    limit: int,
+    offset: int,
+) -> List[Dict[str, Any]]:
+    """
+    Latest row per (hostname, service_name), optionally time-windowed by ts_epoch.
+    Joins last recovery row and a recent failure counter.
+    Returns a list of dicts with stable field names for the UI.
+    """
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+
+    # Optional WHERE on outer SELECT
+    where = []
+    params: List[Any] = []
+    if host:
+        where.append("l.hostname = ?")
+        params.append(host)
+    if status:
+        where.append("l.normalized_status = ?")
+        params.append(status)
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+
+    # Time filter for the inner MAX(ts_epoch) subquery
+    time_filter = "WHERE ts_epoch >= (strftime('%s','now') - (? * 60))" if windowed else ""
+
+    sql = f"""
+    WITH latest AS (
+      SELECT s.*
+      FROM service_status s
+      JOIN (
+        SELECT hostname, service_name, MAX(ts_epoch) AS max_ts
+        FROM service_status
+        {time_filter}
+        GROUP BY hostname, service_name
+      ) m
+        ON s.hostname     = m.hostname
+       AND s.service_name = m.service_name
+       AND s.ts_epoch     = m.max_ts
+    ),
+    last_rec AS (
+      SELECT rl.hostname, rl.service_name,
+             rl.timestamp AS last_recovery_at,
+             rl.result    AS last_recovery_result
+      FROM recovery_logs rl
+      JOIN (
+        SELECT hostname, service_name, MAX(timestamp) AS max_t
+        FROM recovery_logs
+        GROUP BY hostname, service_name
+      ) rmax
+        ON rl.hostname     = rmax.hostname
+       AND rl.service_name = rmax.service_name
+       AND rl.timestamp   = rmax.max_t
+    )
+    SELECT
+      l.hostname                          AS host,
+      l.service_name                      AS service_name,
+      l.os_platform                       AS os_platform,
+      l.normalized_status                 AS status,
+      COALESCE(l.sub_state, '')           AS sub_state,
+      COALESCE(l.unit_file_state, '')     AS unit_file_state,
+      CAST(l.recoverable AS INTEGER)      AS recoverable,
+      datetime(l.ts_epoch, 'unixepoch')   AS updated,
+      COALESCE(r.last_recovery_result,'') AS last_recovery_result,
+      r.last_recovery_at,
+      (
+        SELECT COUNT(*)
+        FROM recovery_logs rf
+        WHERE rf.hostname = l.hostname
+          AND rf.service_name = l.service_name
+          AND rf.result = 'fail'
+          AND rf.timestamp > datetime('now','-30 minutes')
+      ) AS recent_failures
+    FROM latest l
+    LEFT JOIN last_rec r
+      ON r.hostname     = l.hostname
+     AND r.service_name = l.service_name
+    {where_sql}
+    ORDER BY l.hostname, l.service_name
+    LIMIT ? OFFSET ?;
+    """
+
+    exec_params: List[Any] = []
+    if windowed:
+        exec_params.append(int(since_minutes))   # minutes for ts_epoch filter
+    exec_params.extend(params)                   # WHERE host/status (outer)
+    exec_params.extend([limit, offset])          # pagination
+
+    cur.execute(sql, exec_params)
+    rows = [dict(r) for r in cur.fetchall()]
+    con.close()
+    return rows
+
+
+def _services_count_query(
+    windowed: bool,
+    host: Optional[str],
+    status: Optional[str],
+    since_minutes: int,
+) -> int:
+    """
+    Count distinct (host, service) from the same latest snapshot CTE.
+    """
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+
+    where = []
+    params: List[Any] = []
+    if host:
+        where.append("l.hostname = ?")
+        params.append(host)
+    if status:
+        where.append("l.normalized_status = ?")
+        params.append(status)
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+
+    time_filter = "WHERE ts_epoch >= (strftime('%s','now') - (? * 60))" if windowed else ""
+
+    sql = f"""
+    WITH latest AS (
+      SELECT s.*
+      FROM service_status s
+      JOIN (
+        SELECT hostname, service_name, MAX(ts_epoch) AS max_ts
+        FROM service_status
+        {time_filter}
+        GROUP BY hostname, service_name
+      ) m
+        ON s.hostname     = m.hostname
+       AND s.service_name = m.service_name
+       AND s.ts_epoch     = m.max_ts
+    )
+    SELECT COUNT(*) AS n
+    FROM latest l
+    {where_sql};
+    """
+
+    exec_params: List[Any] = []
+    if windowed:
+        exec_params.append(int(since_minutes))
+    exec_params.extend(params)
+
+    cur.execute(sql, exec_params)
+    n = int(cur.fetchone()[0])
+    con.close()
+    return n
+
+# --- public ------------------------------------------------------------------
+
+def latest_services(
+    host: Optional[str] = None,
+    status: Optional[str] = None,
+    since_minutes: int = 1440,
+    limit: int = 200,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    """
+    Prefer a time-window (since_minutes); if empty, fall back to unwindowed latest.
+    """
+    rows = _services_query(True, host, status, since_minutes, limit, offset)
+    if rows:
+        return rows
+    return _services_query(False, host, status, since_minutes, limit, offset)
+
+
+def services_count(
+    host: Optional[str] = None,
+    status: Optional[str] = None,
+    since_minutes: int = 1440,
+) -> int:
+    n = _services_count_query(True, host, status, since_minutes)
+    if n > 0:
+        return n
+    return _services_count_query(False, host, status, since_minutes)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#
+# def _services_query(windowed: bool,
+#                     host: Optional[str],
+#                     status: Optional[str],
+#                     since_minutes: int,
+#                     limit: int,
+#                     offset: int) -> List[Dict[str, Any]]:
+#     """
+#     Run the 'latest per (host, service)' selection, optionally windowed by time.
+#     Returns list of dict rows.
+#     """
+#     conn = sqlite3.connect(DB_PATH)
+#     conn.row_factory = sqlite3.Row
+#     cur = conn.cursor()
+#
+#     # WHERE filters for the outer SELECT
+#     where = []
+#     params: List[Any] = []
+#
+#     if host:
+#         where.append("l.hostname = ?")
+#         params.append(host)
+#     if status:
+#         where.append("l.normalized_status = ?")
+#         params.append(status)
+#
+#     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+#
+#     # Time filter appears in the MAX(ts_epoch) subqueries when windowed
+#     time_filter = "WHERE timestamp > DATETIME('now', ?)" if windowed else ""
+#
+#     # NOTE: we use MAX(ts_epoch) to pick the latest row per (host, service)
+#     sql = f"""
+#     WITH latest AS (
+#       SELECT s.*
+#       FROM service_status s
+#       JOIN (
+#         SELECT hostname, service_name, MAX(ts_epoch) AS max_ts
+#         FROM service_status
+#         {time_filter}
+#         GROUP BY hostname, service_name
+#       ) m
+#       ON s.hostname = m.hostname
+#      AND s.service_name = m.service_name
+#      AND s.ts_epoch = m.max_ts
+#     ),
+#     last_rec AS (
+#       SELECT rl.hostname, rl.service_name,
+#              rl.timestamp AS last_recovery_at,
+#              rl.result    AS last_recovery_result
+#       FROM recovery_logs rl
+#       JOIN (
+#         SELECT hostname, service_name, MAX(timestamp) AS max_t
+#         FROM recovery_logs
+#         GROUP BY hostname, service_name
+#       ) rmax
+#       ON rl.hostname = rmax.hostname
+#      AND rl.service_name = rmax.service_name
+#      AND rl.timestamp = rmax.max_t
+#     )
+#     SELECT
+#       l.hostname            AS host,
+#       l.os_platform,
+#       l.service_name,
+#       l.normalized_status   AS status,
+#       l.sub_state,
+#       l.unit_file_state,
+#       l.recoverable,
+#       l.timestamp           AS updated,
+#       COALESCE(r.last_recovery_result,'') AS last_recovery_result,
+#       r.last_recovery_at,
+#       (
+#         SELECT COUNT(*)
+#         FROM recovery_logs rf
+#         WHERE rf.hostname = l.hostname
+#           AND rf.service_name = l.service_name
+#           AND rf.result = 'fail'
+#           AND rf.timestamp > DATETIME('now', '-30 minutes')
+#       ) AS recent_failures
+#     FROM latest l
+#     LEFT JOIN last_rec r
+#       ON r.hostname = l.hostname
+#      AND r.service_name = l.service_name
+#     {where_sql}
+#     ORDER BY l.hostname, l.service_name
+#     LIMIT ? OFFSET ?;
+#     """
+#
+#     # Build parameters in the order of placeholders in SQL
+#     exec_params: List[Any] = []
+#     if windowed:
+#         # time parameter for the CTE's inner subquery
+#         exec_params.append(f"-{since_minutes} minutes")
+#     # filters for WHERE
+#     exec_params.extend(params)
+#     # pagination
+#     exec_params.extend([limit, offset])
+#
+#     cur.execute(sql, exec_params)
+#     rows = [dict(r) for r in cur.fetchall()]
+#     conn.close()
+#     return rows
+#
+#
+# def latest_services(
+#         host: Optional[str] = None,
+#         status: Optional[str] = None,   # matches normalized_status
+#         since_minutes: int = 1440,
+#         limit: int = 200,
+#         offset: int = 0,
+# ) -> List[Dict[str, Any]]:
+#     """
+#     Return one row per (host, service) = latest in service_status,
+#     joined with last recovery_logs row and a recent fail counter.
+#
+#     Robust behavior:
+#     - Try 'windowed' (within since_minutes).
+#     - If 0 rows, fall back to 'unwindowed' (any time).
+#     """
+#     # 1) windowed attempt
+#     rows = _services_query(
+#         windowed=True,
+#         host=host,
+#         status=status,
+#         since_minutes=since_minutes,
+#         limit=limit,
+#         offset=offset,
+#     )
+#     if rows:
+#         return rows
+#
+#     # 2) fallback (no time window)
+#     return _services_query(
+#         windowed=False,
+#         host=host,
+#         status=status,
+#         since_minutes=since_minutes,  # not used when windowed=False
+#         limit=limit,
+#         offset=offset,
+#     )
+#
+#
+# def _services_count_query(windowed: bool,
+#                           host: Optional[str],
+#                           status: Optional[str],
+#                           since_minutes: int) -> int:
+#     """
+#     Count distinct (host, service) pairs for the latest snapshot.
+#     """
+#     conn = sqlite3.connect(DB_PATH)
+#     conn.row_factory = sqlite3.Row
+#     cur = conn.cursor()
+#
+#     where = []
+#     params: List[Any] = []
+#
+#     if host:
+#         where.append("l.hostname = ?")
+#         params.append(host)
+#     if status:
+#         where.append("l.normalized_status = ?")
+#         params.append(status)
+#     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+#
+#     time_filter = "WHERE timestamp > DATETIME('now', ?)" if windowed else ""
+#
+#     sql = f"""
+#     WITH latest AS (
+#       SELECT s.*
+#       FROM service_status s
+#       JOIN (
+#         SELECT hostname, service_name, MAX(ts_epoch) AS max_ts
+#         FROM service_status
+#         {time_filter}
+#         GROUP BY hostname, service_name
+#       ) m
+#       ON s.hostname = m.hostname
+#      AND s.service_name = m.service_name
+#      AND s.ts_epoch = m.max_ts
+#     )
+#     SELECT COUNT(*) AS n
+#     FROM latest l
+#     {where_sql};
+#     """
+#
+#     exec_params: List[Any] = []
+#     if windowed:
+#         exec_params.append(f"-{since_minutes} minutes")
+#     exec_params.extend(params)
+#
+#     cur.execute(sql, exec_params)
+#     n = cur.fetchone()[0]
+#     conn.close()
+#     return int(n)
+#
+#
+# def services_count(host: Optional[str] = None,
+#                    status: Optional[str] = None,
+#                    since_minutes: int = 1440) -> int:
+#     """
+#     Robust count with the same fallback logic used by latest_services().
+#     """
+#     n = _services_count_query(
+#         windowed=True,
+#         host=host,
+#         status=status,
+#         since_minutes=since_minutes,
+#     )
+#     if n > 0:
+#         return n
+#     return _services_count_query(
+#         windowed=False,
+#         host=host,
+#         status=status,
+#         since_minutes=since_minutes,
+#     )
+#
+
+
+
+
+
+
+
 
 
 

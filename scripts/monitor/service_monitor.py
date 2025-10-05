@@ -408,7 +408,7 @@ def collect_service_status():
             "sub_state": sub_state,
             "service_type": service_type,
             "unit_file_state": unit_file_state,
-            "recoverable": str(recoverable)
+            "recoverable": 1 if recoverable else 0
         })
     return rows
 
@@ -428,6 +428,7 @@ if __name__ == "__main__":
             time.sleep(60)
     except KeyboardInterrupt:
         print("[INFO] Service Monitor stopped by user.")
+
 
 
 

@@ -3,13 +3,9 @@
 #------------------------------------------
 
 import sqlite3
-import os
-import json
 from datetime import datetime
-from pathlib import Path
-from db.core import DB_PATH, connect_rw
+from db.core import DB_PATH, connect_rw, resolve_db_path
 
-import logging
 
 # CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/db_config.json"))
 # with open(CONFIG_PATH, "r") as f:
@@ -133,9 +129,12 @@ def log_process_status_batch(processes):
 # Batch log service status
 # ---------------------------
 def log_service_status_batch(services):
+    db_target = resolve_db_path()
+    print(f"[DEBUG] service_status -> {db_target} (rows={len(services)})")
+
     conn = None
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = connect_rw()
         cursor = conn.cursor()
 
         cursor.executemany("""

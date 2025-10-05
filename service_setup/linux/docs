@@ -146,6 +146,19 @@ https://github.com/coleifer/sqlite-web?utm_source=chatgpt.com
       -e SQLITE_DATABASE=smart_factory_monitor.db \
       ghcr.io/coleifer/sqlite-web:latest
 
+      or best option
+
+   docker run -d --name sqliteweb \
+          -p 5001:8080 \
+          -p 4040:4040  \
+          -v /var/lib/smart-monitor:/data:Z \
+          -e SQLITE_DATABASE=smart_factory_monitor.db \
+          -e NGROK_AUTHTOKEN=32QMO72DgQGrHoI7TgyCEUYZzq9_4CKBYHT61wBoEiH7Q7VTE \
+          -e NGROK_ADDR=localhost:8080 \
+          -e NGROK_BASIC_AUTH=demo:demo123 \
+          --user 0:0 \
+          anselemo/smartmon-sqliteweb:latest
+
       Z:option allows the content to be shared among multiple containers
       ro:option read only
 
@@ -180,4 +193,74 @@ https://github.com/coleifer/sqlite-web?utm_source=chatgpt.com
         sudo firewall-cmd --add-port=9080/tcp --permanent
         sudo firewall-cmd --reload
         then on window, ipconfig to get Wireless LAN adapter Wi-Fi eg http://192.168.0.76:9080/ or localhost http://localhost:9080/ or hostonly http://192.168.56.12:9080/
+
+File Permision Issues
+    1) Ensure the web user is in the smartmonitor group (relog after adding)
+        sudo usermod -aG smartmonitor vagrant
+
+    2) Fix ownership + perms on the data dir and DB file
+        sudo chgrp -R smartmonitor /var/lib/smart-monitor
+        sudo chmod 2775 /var/lib/smart-monitor                   # keep setgid on dir
+        sudo chown root:smartmonitor /var/lib/smart-monitor/smart_factory_monitor.db
+        sudo chmod 664 /var/lib/smart-monitor/smart_factory_monitor.db  # <-- key change
+
+    3) Optional: default ACL so all new files are group-rw automatically
+        sudo setfacl -d -m g::rwx /var/lib/smart-monitor
+            User=root
+            Group=root
+            UMask=0002
+
+            ACLs installations: incase If needed optional
+            Install the tool, then set a default ACL so every new file gets group rwx automatically
+                sudo apt update && sudo apt install -y acl
+                sudo setfacl -m g:smartmonitor:rwx -m d:g:smartmonitor:rwx /var/lib/smart-monitor
+                sudo getfacl /var/lib/smart-monitor
+
+
+    4) Option A: start a fresh login shell for vagrant
+        sudo su - vagrant
+
+    5) Option B: switch to the group for this subshell
+        newgrp smartmonitor
+        sudo systemctl daemon-reload
+        sudo systemctl restart smart-monitor
+
+    Test:
+    # reload group membership (new shell) and verify
+        groups vagrant
+
+    # DB can be written by vagrant?
+        sudo -u vagrant sqlite3 /var/lib/smart-monitor/smart_factory_monitor.db \
+        "PRAGMA journal_mode; SELECT 1;"
+
+    # Try a tiny insert (adjust table/cols if needed)
+        sudo -u vagrant sqlite3 /var/lib/smart-monitor/smart_factory_monitor.db \
+        "INSERT INTO smart_health(hostname,device) VALUES('web01','/dev/null');"
+
+
+ What each command/config does:
+     1. usermod -aG smartmonitor vagrant
+            Adds vagrant to the smartmonitor group. Now anything owned by group smartmonitor (the DB + dir)
+            can be read/written by Flask app running as vagrant.
+
+     2. chgrp -R smartmonitor /var/lib/smart-monitor
+            Puts the whole data directory (and current files) under the smartmonitor group so members of that group can access them.
+
+     3. chmod 2775 /var/lib/smart-monitor
+            rwxrwsr-x + the setgid bit (2): new files created inside this directory inherit the directory’s group (smartmonitor) automatically.
+            This prevents “wrong group” surprises on the SQLite -wal/-shm files.
+
+     4. chown root:smartmonitor smart_factory_monitor.db and chmod 664
+            Owner = root, Group = smartmonitor.
+            Mode 664 ⇒ owner+group can read/write, others read-only.
+            applied the same 664 to *.db-wal and *.db-shm, which are the WAL-mode sidecar files SQLite actually writes to during normal operation.
+
+     5. Systemd unit: User=root, Group=root, UMask=0002
+            Running the monitor as root avoids the “Failed to connect to bus” mess and removes the need for sudo systemctl ….
+            UMask=0002 ensures any new files created by the service (including WAL/SHM) get group-write (-rw-rw-r--).
+            Combined with the directory’s setgid, those new files will land in group smartmonitor, so vagrant can write too.
+
+     6. Refresh group membership” (new login shell / newgrp smartmonitor)
+            current shell doesn’t learn new groups automatically. Starting a new login shell makes vagrant actually use the smartmonitor group for access.
+
 

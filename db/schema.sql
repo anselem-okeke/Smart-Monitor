@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS process_status (
 CREATE TABLE IF NOT EXISTS service_status (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ts_epoch INTEGER GENERATED ALWAYS AS (CAST(strftime('%s', timestamp) AS INTEGER)) STORED,
     hostname TEXT NOT NULL,
     os_platform TEXT NOT NULL,
     service_name TEXT NOT NULL,
@@ -57,8 +56,15 @@ CREATE TABLE IF NOT EXISTS service_status (
     sub_state TEXT,                           -- systemd SubState (e.g. running, dead)
     service_type TEXT,                        -- systemd Type (e.g. simple, forking)
     unit_file_state TEXT,                     -- enabled, static, masked, linked
-    recoverable BOOLEAN DEFAULT FALSE         -- Whether it’s safe to restart
+    recoverable BOOLEAN DEFAULT FALSE,         -- Whether it’s safe to restart
+    ts_epoch INTEGER GENERATED ALWAYS AS (CAST(strftime('%s', timestamp) AS INTEGER)) STORED
 );
+
+CREATE INDEX idx_ss_host_os_svc_ts
+  ON service_status(hostname, os_platform, service_name, ts_epoch DESC);
+
+CREATE INDEX idx_ss_status_ts
+  ON service_status(normalized_status, ts_epoch DESC);
 
 -- Table to log system alerts and anomalies
 CREATE TABLE IF NOT EXISTS alerts (
