@@ -1,0 +1,285 @@
+Smart-Monitor — Services UI + Restart (Dev Guide)
+This doc captures everything implemented: APIs, UI pages, RBAC, allowlist, cooldown/backoff,
+DRY-RUN, env, and how to test it end-to-end.
+
+1) Current State
+    Architecture
+        UI routes (Flask blueprint ui)
+            /services – services table (filters + client-side sort + CSV)
+            /services/<host>/<service> – service detail (history, uptime %, last change, attempts)
+            /services/<host>/<service>/restart – server-side button → calls API with server key
+
+        API routes (Flask blueprint api)
+            GET /api/services – paged latest snapshot (table data)
+            GET /api/services.csv – CSV export for the table
+            GET /api/services/<host>/<service>/history?since_minutes=… – JSON history
+            GET /api/services/<host>/<service>/export.csv?since_minutes=… – CSV history
+            POST /api/services/restart – guarded restart (RBAC + allowlist + recoverable + cooldown/backoff + DRY-RUN)
+
+    Databases (SQLite)
+        service_status – snapshots from your collector (fields include hostname, service_name, ts_epoch, timestamp, normalized_status, sub_state, unit_file_state, recoverable, os_platform)
+        recovery_logs – manual/auto restart attempts (schema shown below)
+
+2) Database schema (ensure this exists)
+    -- recovery logs (we log queued/success/fail + message)
+        CREATE TABLE IF NOT EXISTS recovery_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          hostname TEXT NOT NULL,
+          os_platform TEXT NOT NULL,
+          service_name TEXT NOT NULL,
+          result TEXT NOT NULL,                 -- queued | success | fail
+          error_message TEXT DEFAULT ''
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_recovery_logs_hs_time
+          ON recovery_logs(hostname, service_name, timestamp);
+
+        -- performance: for service_status queries
+        CREATE INDEX IF NOT EXISTS idx_status_hst_svc_ts
+          ON service_status(hostname, service_name, ts_epoch);
+
+    Check quickly:
+        DB=${SMARTMONITOR_DB_PATH:-$SMARTMON_DB}
+        sqlite3 "$DB" '.schema recovery_logs'
+        sqlite3 "$DB" '.schema service_status'
+
+3) Environment variables
+    Put these in /etc/smart-monitor/env (dev: 600 perms recommended):
+        # DB
+        SMARTMONITOR_DB_PATH=/var/lib/smart-monitor/smart_factory_monitor.db
+
+        # Restart safety / RBAC
+        SMARTMON_API_KEY=dev-secret
+        SMARTMON_APPROVED_JSON=/etc/smart-monitor/approved_services.json
+        SMARTMON_RESTART_COOLDOWN_MIN=10
+        SMARTMON_RESTART_BACKOFF_FAILS=3
+        SMARTMON_RESTART_BACKOFF_WINDOW_MIN=30
+        DRY_RUN=true              # set false to actually systemctl restart
+
+        # Flask (for flash/session)
+        SMARTMON_SECRET_KEY=dev-please-change
+
+        # Optional: where the UI calls the API internally
+        SMARTMON_INTERNAL_API=http://127.0.0.1:5000
+
+    Allowlist file /etc/smart-monitor/approved_services.json:
+        {
+          "allow": [
+            {"host": "web01",          "service": "nginx.service"},
+            {"host": "ZZZZ-sentinel",  "service": "*"}
+          ]
+        }
+
+    Meaning: restart is permitted only if (host,service) matches allowlist and
+    the latest snapshot has recoverable == 1.
+
+4) Running in development
+    currently starting Flask manually; load env first:
+        set -a
+        . /etc/smart-monitor/env
+        set +a
+
+        # sanity check
+        python3 - <<'PY'
+        import os; print("DB =", os.getenv("SMARTMONITOR_DB_PATH") or os.getenv("SMARTMON_DB"))
+        print("API_KEY set?", bool(os.getenv("SMARTMON_API_KEY")))
+        print("APPROVED_JSON =", os.getenv("SMARTMON_APPROVED_JSON"))
+        print("DRY_RUN =", os.getenv("DRY_RUN"))
+        PY
+
+        python3 -m gui.app
+
+    prefer auto-loading: pip install python-dotenv and call
+    load_dotenv("/etc/smart-monitor/env", override=False) once at app startup.
+
+5) App configuration (one-time)
+    Set a SECRET_KEY so flash() works (add where the Flask app is created):
+        import os, secrets
+        app.config['SECRET_KEY'] = os.getenv('SMARTMON_SECRET_KEY') or secrets.token_hex(32)
+
+    Optional: a flash area in templates/base.html (already added):
+        <main class="content">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <div class="flash-wrap">
+                {% for category, message in messages %}
+                  <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endwith %}
+        {% block content %}{% endblock %}
+       </main>
+
+6) Endpoints (how to use/test)
+    Table data
+        curl -s 'http://127.0.0.1:5000/api/services?host=&status=&since_minutes=1440&limit=200&offset=0' | jq
+        curl -OJ 'http://127.0.0.1:5000/api/services.csv?since_minutes=1440'
+
+    Per-service history
+        curl -s 'http://127.0.0.1:5000/api/services/web01/nginx.service/history?since_minutes=1440' | jq
+        curl -OJ 'http://127.0.0.1:5000/api/services/web01/nginx.service/export.csv?since_minutes=1440'
+
+    Guarded restart (direct API)
+        # 401 without key (proves RBAC works)
+        curl -i -X POST http://127.0.0.1:5000/api/services/restart \
+          -H 'Content-Type: application/json' \
+          -d '{"host":"web01","service":"nginx.service"}'
+
+        # with key
+        curl -s -X POST http://127.0.0.1:5000/api/services/restart \
+          -H "X-API-Key: $SMARTMON_API_KEY" \
+          -H 'Content-Type: application/json' \
+          -d '{"host":"web01","service":"nginx.service"}' | jq
+
+    Possible JSON responses:
+        {"ok":true,"result":"success","executed_on":"web01"} – local systemctl ran
+        {"ok":true,"result":"queued","queued_for":"web01"} – remote host (no agent yet)
+        {"ok":true,"result":"queued","dry_run":true} – DRY-RUN enabled
+        {"ok":false,"error":"not in approved_services.json"} – 403
+        {"ok":false,"error":"service not recoverable"} – 409
+        {"ok":false,"error":"cooldown 10m active"} – 429
+        {"ok":false,"error":"backoff: 3 fails in 30m"} – 429
+
+7) UI pieces (where they live)
+    Services list
+        Template: templates/services.html
+        Route: views/services.py → @ui_bp.get("/services")
+        Fetches GET /api/services…, client-sorts, links each row to detail:
+            /services/<host>/<service>
+
+    Service detail
+        Template: templates/service_details.html
+        Route: views/services.py → @ui_bp.get("/services/<host>/<path:service>")
+
+        Shows:
+            Latest status fields
+            Uptime % over the window (computed by walking sorted ts_epoch segments: active=up, others=down)
+            Last change timestamp (last transition found scanning backward)
+            Window picker
+            JSON/CSV links for that service
+            History table (DESC)
+            Recent recovery attempts (from recovery_logs)
+
+        Restart button (server-side)
+            Template snippet (only if recoverable):
+
+                {% if latest["recoverable"] %}
+                <form method="post"
+                      action="/services/{{ host }}/{{ service }}/restart?minutes={{ minutes }}"
+                      style="display:inline"
+                      onsubmit="return confirm('Restart {{ service }} on {{ host }}?')">
+                  <button type="submit">Restart</button>
+                </form>
+                {% endif %}
+
+            UI route: views/services.py:
+
+                import os, urllib.parse, requests
+                from flask import request, redirect, url_for, flash
+                from . import ui_bp
+
+                API_KEY = os.getenv("SMARTMON_API_KEY")
+                INTERNAL_API = os.getenv("SMARTMON_INTERNAL_API", "http://127.0.0.1:5000")
+
+                @ui_bp.post("/services/<host>/<path:service>/restart")
+                def service_restart_ui(host, service):
+                    service = urllib.parse.unquote(service)
+                    minutes = request.args.get("minutes", 1440)
+                    url = f"{INTERNAL_API.rstrip('/')}/api/services/restart"
+                    try:
+                        r = requests.post(
+                            url,
+                            headers={"X-API-Key": API_KEY, "Content-Type": "application/json"},
+                            json={"host": host, "service": service},
+                            timeout=15,
+                        )
+                        data = r.json()
+                        if r.ok and data.get("ok"):
+                            msg = f"Restart {data.get('result')} for {service} on {host}"
+                            if data.get("dry_run"): msg += " (dry-run)"
+                            flash(msg, "success")
+                        else:
+                            err = (data.get("error") or data.get("stderr") or f"HTTP {r.status_code}")
+                            flash(f"Restart failed/blocked: {err}", "error")
+                    except Exception as e:
+                        flash(f"Restart request error: {e}", "error")
+                    return redirect(url_for(".service_detail", host=host, service=service, minutes=minutes))
+
+8) Guard logic (what the API enforces)
+    POST /api/services/restart checks, in order:
+        RBAC key
+            If SMARTMON_API_KEY is set, header X-API-Key must match (else 401).
+
+        Allowlist (SMARTMON_APPROVED_JSON)
+            (host, service) must match an entry, wildcard * allowed (else 403).
+
+        Recoverable (service_status.recoverable == 1)
+            Latest snapshot per (host, service) (else 409).
+
+        Cooldown
+            If a recent attempt exists for this pair within SMARTMON_RESTART_COOLDOWN_MIN, block (429).
+
+        Backoff
+            If there are ≥ SMARTMON_RESTART_BACKOFF_FAILS fail rows within
+            SMARTMON_RESTART_BACKOFF_WINDOW_MIN, block (429).
+
+        DRY-RUN
+            If DRY_RUN=true, don’t systemctl; just log queued / dry-run and return 202.
+
+        Execute or queue
+            If host == socket.gethostname(): run /bin/systemctl restart <service>, log success/fail (+ stderr).
+            Else: queue a queued / manual restart request row for an agent on that host.
+            “Recoverable” = collector or policy marks this unit safe to restart (non-critical, not masked/static, etc.). We still require it even if allowlist matches.
+
+9) Quick troubleshoot
+        401 on API → missing/wrong X-API-Key.
+
+        HTML error pages / jq parse error → check Flask logs; common causes:
+            Missing os_platform in recovery_logs insert (we fixed by fetching from latest snapshot).
+            No SECRET_KEY when calling flash() (add app.config['SECRET_KEY']).
+
+        Always “queued” even on same host → DB hostname ≠ actual host.
+            python3 -c 'import socket; print(socket.gethostname())'
+
+        Ensure your collector writes that host string (e.g., web01) into service_status.hostname.
+            Repeated clicks blocked → cooldown working. Lower for dev:
+                export SMARTMON_RESTART_COOLDOWN_MIN=1
+
+        Systemctl perms (when DRY_RUN=false)
+            If the app isn’t root, add a sudoers rule (later in prod):
+                # /etc/sudoers.d/smart-monitor
+                smartmon ALL=(root) NOPASSWD:/bin/systemctl restart nginx.service
+                and call sudo /bin/systemctl restart nginx.service.
+
+10) Tiny helper scripts
+        Load env + run (dev):
+            #!/usr/bin/env bash
+            set -euo pipefail
+            set -a; . /etc/smart-monitor/env; set +a
+            exec python3 -m gui.app
+
+        Test restart (curl)
+            #!/usr/bin/env bash
+            h=${1:-web01}; s=${2:-nginx.service}
+            curl -s -X POST http://127.0.0.1:5000/api/services/restart \
+              -H "X-API-Key: ${SMARTMON_API_KEY:-}" \
+              -H 'Content-Type: application/json' \
+              -d "{\"host\":\"$h\",\"service\":\"$s\"}" | jq
+
+11) Security notes (current dev posture)
+    Anyone who can reach the UI can click Restart; the API still enforces the guards. To restrict by user, add basic auth/login later.
+    The API key never leaves the server; the browser doesn’t see it.
+    Keep env file root-owned (600) and don’t commit it.
+
+
+
+
+
+
+
+
+
+
+

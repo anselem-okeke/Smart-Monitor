@@ -102,6 +102,40 @@ canvas{
 .nowrap{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:520px; }
 
 
+.flash-wrap{margin:8px 0}
+.flash{padding:8px 10px;border-radius:8px;margin-bottom:8px}
+.flash.success{background:#10391a;color:#b7f7c0}
+.flash.error{background:#3a0e0e;color:#ffb3b3}
+
+
+
+/* --- fixed footer --- */
+.site-footer{
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1000;
+  background: #0b1623;           /* matches your dark theme */
+  border-top: 1px solid rgba(255,255,255,0.06);
+  color: #9fb3c8;
+  font-size: 15px;
+  text-align: center;
+}
+.site-footer .footer-inner{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.foot-title{ font-weight: 600; color: #cfe4ff; }
+.foot-version{ opacity: .85; }
+.foot-powered{ opacity: .8; }
+.foot-sep, .foot-dot{ opacity: .5; padding: 0 2px; }
+
+/* Add bottom padding so content isn't hidden behind fixed footer */
+main.content{ padding-bottom: 50px; }
+.site-footer a{ color:#cfe4ff; text-decoration:none }
+.site-footer a:hover{ text-decoration:underline }
+
 
 
 

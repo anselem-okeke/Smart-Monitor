@@ -39,23 +39,53 @@
   </aside>
 
   <main class="content">
+     {# flash messages #}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-wrap">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
     {% block content %}{% endblock %}
   </main>
 
-<!--  <footer class="footer" role="contentinfo">-->
-<!--    {{ app_name }} v{{ app_version }}{% if git_sha %} ({{ git_sha }}){% endif %}.-->
-<!--    Powered by-->
-<!--    <a href="https://flask.palletsprojects.com/" target="_blank" rel="noopener">Flask</a>-->
-<!--    and-->
-<!--    <a href="https://www.sqlite.org/" target="_blank" rel="noopener">SQLite</a>.-->
-<!--    © {{ current_year }}-->
-<!--    <a class="owner-link" href="{{ author_url }}" target="_blank" rel="noopener">-->
-<!--      {% if author_avatar %}-->
-<!--        <img class="owner-avatar" src="{{ author_avatar }}" alt="{{ author_name }} avatar">-->
-<!--      {% endif %}-->
-<!--      {{ author_name }}-->
-<!--    </a>.-->
+
+<!--  <footer class="site-footer">-->
+<!--    <div class="footer-inner">-->
+<!--      <span class="foot-title">{{ app_name }}</span>-->
+<!--      <span class="foot-dot">•</span>-->
+<!--      <span class="foot-version">{{ app_version }}</span>-->
+<!--      <span class="foot-dot">•</span>-->
+<!--      <span class="foot-powered">powered by {{ powered_by }}</span>-->
+<!--      <span class="foot-sep">—</span>-->
+<!--      <span class="foot-copy">© {{ copyright_year }} {{ copyright_owner }}</span>-->
+<!--    </div>-->
 <!--  </footer>-->
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <a class="foot-title" href="{{ project_url }}" target="_blank" rel="noopener">{{ app_name }}</a>
+        <span class="foot-dot">•</span>
+        <span class="foot-version">{{ app_version }}</span>
+        <span class="foot-dot">•</span>
+        <span class="foot-powered">
+          powered by
+          <a href="{{ flask_url }}" target="_blank" rel="noopener">Flask</a>
+          &
+          <a href="{{ sqlite_url }}" target="_blank" rel="noopener">SQLite</a>
+        </span>
+        <span class="foot-sep">—</span>
+        <span class="foot-copy">
+          © {{ copyright_year }}
+          <a href="{{ owner_url }}" target="_blank" rel="noopener">{{ copyright_owner }}</a>
+        </span>
+      </div>
+    </footer>
+
 
 
 </body>

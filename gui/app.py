@@ -44,11 +44,19 @@
 
 # app.py
 # app.py
-import os, subprocess
+import os, subprocess, secrets
 from datetime import datetime
 from flask import Flask
 from .api import api_bp
 from .views import ui_bp
+from dotenv import load_dotenv
+from gui import config
+
+# Load /etc/smart-monitor/env if present; don't override real env
+load_dotenv("/etc/smart-monitor/env", override=False)
+# (optional) also load a local .env during dev
+load_dotenv(".env", override=False)
+
 
 def _git_sha():
     sha = os.getenv("SMARTMONITOR_GIT_SHA")
@@ -65,24 +73,28 @@ def _git_sha():
 def create_app():
     app = Flask(__name__)
 
-    app.config["APP_NAME"]      = os.getenv("SMARTMONITOR_APP_NAME", "Smart Monitor")
-    app.config["APP_VERSION"]   = os.getenv("SMARTMONITOR_VERSION", "0.1.0")
-    app.config["AUTHOR_NAME"]   = os.getenv("SMARTMONITOR_AUTHOR_NAME", "Your Name")
-    app.config["AUTHOR_URL"]    = os.getenv("SMARTMONITOR_AUTHOR_URL", "https://github.com/youruser")
-    app.config["AUTHOR_AVATAR"] = os.getenv("SMARTMONITOR_AUTHOR_AVATAR", "")  # URL or empty to hide
-    app.config["GIT_SHA"]       = _git_sha()
+    app.config['SECRET_KEY'] = os.getenv('SMARTMON_SECRET_KEY') or secrets.token_hex(32)
+
+    # app.config["APP_NAME"]      = os.getenv("SMARTMONITOR_APP_NAME", "Smart Monitor")
+    # app.config["APP_VERSION"]   = os.getenv("SMARTMONITOR_VERSION", "0.1.0")
+    # app.config["AUTHOR_NAME"]   = os.getenv("SMARTMONITOR_AUTHOR_NAME", "Your Name")
+    # app.config["AUTHOR_URL"]    = os.getenv("SMARTMONITOR_AUTHOR_URL", "https://github.com/youruser")
+    # app.config["AUTHOR_AVATAR"] = os.getenv("SMARTMONITOR_AUTHOR_AVATAR", "")  # URL or empty to hide
+    # app.config["GIT_SHA"]       = _git_sha()
 
     @app.context_processor
-    def inject_footer_meta():
-        return {
-            "app_name": app.config["APP_NAME"],
-            "app_version": app.config["APP_VERSION"],
-            "git_sha": app.config["GIT_SHA"],
-            "author_name": app.config["AUTHOR_NAME"],
-            "author_url": app.config["AUTHOR_URL"],
-            "author_avatar": app.config["AUTHOR_AVATAR"],
-            "current_year": datetime.utcnow().year,
-        }
+    def inject_footer_vars():
+        return dict(
+            app_name=config.APP_NAME,
+            app_version=config.APP_VERSION,
+            powered_by=config.POWERED_BY,
+            copyright_owner=config.COPYRIGHT_OWNER,
+            copyright_year=config.COPYRIGHT_YEAR,
+            project_url=config.PROJECT_URL,
+            owner_url=config.OWNER_URL,
+            flask_url=config.FLASK_URL,
+            sqlite_url=config.SQLITE_URL,
+        )
 
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(ui_bp)
