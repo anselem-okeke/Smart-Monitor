@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% if latest["recoverable"] %}
+<form method="post"
+      action="/services/{{ host }}/{{ service }}/restart?minutes={{ minutes }}"
+      style="display:inline"
+      onsubmit="return confirm('Restart {{ service }} on {{ host }}?')">
+  <button type="submit">Restart</button>
+</form>
+{% endif %}
+
+
+<h2>{{ service }} @ {{ host }}</h2>
+
+<!--<p>-->
+<!--  <strong>Status:</strong> {{ latest["normalized_status"] }}-->
+<!--  | <strong>Sub-state:</strong> {{ latest["sub_state"] or "—" }}-->
+<!--  | <strong>Unit file:</strong> {{ latest["unit_file_state"] or "—" }}-->
+<!--  | <strong>Recoverable:</strong> {{ "yes" if latest["recoverable"] else "no" }}-->
+<!--  | <strong>Updated:</strong> {{ latest["timestamp"] }}-->
+<!--</p>-->
+<p>
+  <strong>Status:</strong> {{ latest["normalized_status"] }}
+  | <strong>Sub-state:</strong> {{ latest["sub_state"] or "—" }}
+  | <strong>Unit file:</strong> {{ latest["unit_file_state"] or "—" }}
+  | <strong>Recoverable:</strong> {{ "yes" if latest["recoverable"] else "no" }}
+  | <strong>Updated:</strong> {{ latest["timestamp"] }}
+  | <strong>Uptime:</strong> {{ uptime_pct }}%
+  {% if last_change %}| <strong>Last change:</strong> {{ last_change }}{% endif %}
+</p>
+
+<p style="margin:6px 0">
+  <a href="/api/services/{{ host }}/{{ service }}/history?since_minutes={{ minutes }}">JSON</a>
+  |
+  <a href="/api/services/{{ host }}/{{ service }}/export.csv?since_minutes={{ minutes }}">CSV</a>
+</p>
+
+<form method="get" style="margin:8px 0">
+  <label>Window (minutes):
+    <input name="minutes" type="number" min="5" max="10080" step="5" value="{{ minutes }}">
+  </label>
+  <button type="submit">Apply</button>
+  <a href="/services" style="margin-left:8px">← Back</a>
+</form>
+
+<h3>Recent history</h3>
+<table class="table">
+  <thead><tr>
+    <th>Time</th><th>Status</th><th>Sub-state</th><th>Unit file</th><th>Recoverable</th>
+  </tr></thead>
+  <tbody>
+    {% for r in history %}
+    <tr>
+      <td>{{ r["timestamp"] }}</td>
+      <td>{{ r["normalized_status"] }}</td>
+      <td>{{ r["sub_state"] or "" }}</td>
+      <td>{{ r["unit_file_state"] or "" }}</td>
+      <td>{{ "yes" if r["recoverable"] else "no" }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">No history in this window.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3>Recent recovery attempts</h3>
+<table class="table">
+  <thead><tr><th>Time</th><th>Result</th><th>Error</th></tr></thead>
+  <tbody>
+    {% for a in attempts %}
+    <tr><td>{{ a["timestamp"] }}</td><td>{{ a["result"] }}</td><td>{{ a["error_message"] }}</td></tr>
+    {% else %}
+    <tr><td colspan="3">None.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}
