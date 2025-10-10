@@ -1,0 +1,395 @@
+Smart-Monitor — Hardening & Deploy (End-to-End Doc)  NGINX (reverse proxy on loopback)
+
+This is the “how + why” for everything we wired up: process model, NGINX, Gunicorn, systemd, Cloudflare Tunnel,
+security, and troubleshooting. It’s written so you (or anyone on the team) can repro the deployment from scratch.
+
+0) Goals & Architecture
+    Goal: Safe for real users.
+    Edge/front-door: NGINX (TLS/auth/headers/SSE handling)
+    App server: Gunicorn running the Flask app
+    Background jobs: Orchestrator/collectors writing to SQLite
+    Exposure: Cloudflare Tunnel to a public hostname (no open inbound ports)
+    Data: Single SQLite DB shared by both services
+
+    Internet
+      |
+      |  (HTTPS at Cloudflare)
+      v
+    Cloudflare Tunnel  --->  web01 (no open inbound ports)
+                               |
+                               |  HTTP (loopback)
+                               v
+                            NGINX :80  --->  Gunicorn 127.0.0.1:5003  ---> Flask app
+                               |
+                               +-- security headers, (opt) Basic Auth/CF Access, SSE tuning
+
+    Background orchestrator (separate service) ---> writes to /var/lib/smart-monitor/smart_factory_monitor.db
+
+1) Standard Paths & Ownership (FHS-style)
+    | Purpose               | Path                                                                       | Owner               |
+    | --------------------- | -------------------------------------------------------------------------- | ------------------- |
+    | Code checkout         | `/opt/Smart-Monitor`                                                       | `smartmon:smartmon` |
+    | GUI app               | `/opt/Smart-Monitor/gui`                                                   | `smartmon:smartmon` |
+    | Gunicorn config       | `/opt/Smart-Monitor/gui/gunicorn.conf.py`                                  | `smartmon:smartmon` |
+    | Runtime data (SQLite) | `/var/lib/smart-monitor/smart_factory_monitor.db`                          | `smartmon:smartmon` |
+    | App/Orchestrator env  | `/etc/smart-monitor/env`                                                   | `root:root` (0640)  |
+    | NGINX site            | `/etc/nginx/sites-available/smart-monitor.conf` (symlink to sites-enabled) | root                |
+
+2) Prepare the Host
+    # system user + dirs
+    sudo adduser --system --group smartmon
+    sudo mkdir -p /opt/Smart-Monitor /var/lib/smart-monitor /etc/smart-monitor
+    sudo chown -R smartmon:smartmon /opt/Smart-Monitor /var/lib/smart-monitor
+
+    # copy your repo (adjust source path if needed)
+    sudo rsync -a ~/Smart-Monitor/ /opt/Smart-Monitor/
+
+3) Python Environment & Dependencies
+    cd /opt/Smart-Monitor/gui
+    python3 -m venv .venv --copies
+    . .venv/bin/activate
+    python -m pip install --upgrade pip
+
+    # Fix requirements (examples that caused issues earlier)
+    # - Remove BOM/garbage at file top
+    # - Use blinker==1.8.2 (1.9.0 doesn’t exist)
+    # - Make sure versions are compatible with your Python
+    pip install -r ../requirements.txt
+
+    # Ensure gunicorn present (even if you choose system-wide, this keeps app self-contained)
+    pip install gunicorn
+
+    insist on system-wide Gunicorn:
+        Your systemd unit must call /usr/local/bin/gunicorn and system Python must have all app deps
+         (sudo /usr/bin/python3 -m pip install -r requirements.txt).
+
+4) Gunicorn
+    Config — /opt/Smart-Monitor/gui/gunicorn.conf.py
+
+    bind = "127.0.0.1:5003"      # keep private; NGINX fronts it
+    workers = 2
+    threads = 4
+    timeout = 60
+    graceful_timeout = 30
+    keepalive = 30
+    worker_class = "gthread"     # fine with SSE/long polling
+    accesslog = "-"
+    errorlog = "-"
+    loglevel = "info"
+
+    App import URI:
+        If Flask factory lives in gui/app.py as create_app(), import it as:
+            'gui.app:create_app()' (package form, recommended)
+             Ensure gui/__init__.py exists and PYTHONPATH=/opt/Smart-Monitor.
+
+             If you use from .api import api_bp in app.py, you must run Gunicorn with the package path (gui.app)
+              and set PYTHONPATH so gui is importable.
+
+5) systemd Units (two services)
+    A) GUI (Gunicorn) — /etc/systemd/system/smart-monitor-gui.service
+
+    [Unit]
+    Description=Smart Monitor GUI (Gunicorn)
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    User=smartmon
+    Group=smartmon
+    WorkingDirectory=/opt/Smart-Monitor
+    EnvironmentFile=-/etc/smart-monitor/env
+    Environment=PYTHONUNBUFFERED=1
+    Environment=PYTHONPATH=/opt/Smart-Monitor
+    ExecStart=/opt/Smart-Monitor/gui/.venv/bin/gunicorn \
+      -c /opt/Smart-Monitor/gui/gunicorn.conf.py 'gui.app:create_app()'
+    Restart=on-failure
+    RestartSec=3
+    NoNewPrivileges=true
+    PrivateTmp=true
+    ProtectSystem=full
+    ProtectHome=true
+    ReadWritePaths=/var/lib/smart-monitor
+
+    [Install]
+    WantedBy=multi-user.target
+
+    B) Orchestrator/Collectors — /etc/systemd/system/smart-monitor-orchestrator.service
+
+    [Unit]
+    Description=Smart Monitor Orchestrator (collectors & jobs)
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    User=smartmon
+    Group=smartmon
+    WorkingDirectory=/opt/Smart-Monitor
+    EnvironmentFile=-/etc/smart-monitor/env
+    ExecStart=/usr/bin/python3 /opt/Smart-Monitor/main.py
+    Restart=on-failure
+    RestartSec=3
+    NoNewPrivileges=true
+    PrivateTmp=true
+    ProtectSystem=full
+    ProtectHome=true
+    ReadWritePaths=/var/lib/smart-monitor
+
+    [Install]
+    WantedBy=multi-user.target
+
+
+    Enable + start
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now smart-monitor-gui smart-monitor-orchestrator
+        systemctl status smart-monitor-gui smart-monitor-orchestrator --no-pager
+    Logs
+        journalctl -u smart-monitor-gui -n 50 --no-pager
+        journalctl -u smart-monitor-orchestrator -n 50 --no-pager
+
+6) NGINX (reverse proxy on loopback)
+    1) Put site config in place
+    Site file — /etc/nginx/sites-available/smart-monitor.conf
+
+    A) Direct public Nginx (HTTP→HTTPS with Let’s Encrypt)
+        # Redirect HTTP -> HTTPS
+        server {
+            listen 80;
+            listen [::]:80;
+            server_name monitor.example.com;
+            return 301 https://$host$request_uri;
+        }
+
+        # HTTPS front door
+        server {
+            listen 443 ssl http2;
+            listen [::]:443 ssl http2;
+            server_name monitor.example.com;
+
+            # TLS (certbot will fill these)
+            ssl_certificate     /etc/letsencrypt/live/monitor.example.com/fullchain.pem;
+            ssl_certificate_key /etc/letsencrypt/live/monitor.example.com/privkey.pem;
+
+            # Security headers
+            add_header X-Frame-Options "SAMEORIGIN" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'" always;
+
+            # Basic Auth (turn on if you don't have SSO)
+            # auth_basic "Restricted";
+            # auth_basic_user_file /etc/nginx/.htpasswd;
+
+            location / {
+                proxy_pass         http://127.0.0.1:5003;
+                proxy_set_header   Host              $host;
+                proxy_set_header   X-Real-IP         $remote_addr;
+                proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+                proxy_set_header   X-Forwarded-Proto $scheme;
+
+                # SSE: keep streams happy
+                proxy_http_version 1.1;
+                proxy_set_header   Connection "";
+                proxy_buffering    off;
+                proxy_read_timeout 1h;
+            }
+
+            # Custom error pages (adjust path to your repo’s static dir)
+            error_page 404 /custom_404.html;
+            location = /custom_404.html { root /opt/Smart-Monitor/gui/static; internal; }
+
+            error_page 500 502 503 504 /custom_500.html;
+            location = /custom_500.html { root /opt/Smart-Monitor/gui/static; internal; }
+        }
+
+        Enable it:
+            sudo ln -sf /etc/nginx/sites-available/smart-monitor.conf /etc/nginx/sites-enabled/smart-monitor.conf
+            sudo nginx -t && sudo systemctl reload nginx
+
+    2) Obtain TLS certs with certbot
+        sudo apt update && sudo apt install -y certbot python3-certbot-nginx apache2-utils
+        sudo certbot --nginx -d monitor.example.com --redirect --agree-tos -m you@example.com
+
+        (Optional) Basic Auth:
+            sudo htpasswd -c /etc/nginx/.htpasswd admin
+            sudo nginx -t && sudo systemctl reload nginx
+        Test:
+            curl -I https://monitor.example.com
+
+            Make sure DNS A/AAAA record for monitor.example.com points to this server’s public IP and that
+            inbound 80/443 are open in any firewall/security group.
+
+
+    B) Cloudflare Tunnel fronting Nginx (no public ports on the server)
+        In this model, Cloudflare terminates HTTPS; your local Nginx can stay HTTP on loopback.
+
+    1) Simplify Nginx to local HTTP only
+    /etc/nginx/sites-available/smart-monitor.conf:
+
+        server {
+          listen 127.0.0.1:80 default_server;
+          server_name smart-monitor.example.tld _;
+
+          # helpful debug marker while wiring
+          add_header X-Debug "smart-monitor-proxy" always;
+
+          # Security headers
+          add_header X-Frame-Options "SAMEORIGIN" always;
+          add_header X-Content-Type-Options "nosniff" always;
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+          add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'" always;
+
+          # Optional probe to confirm vhost selection
+          location = /whoami { add_header Content-Type text/plain; return 200 "smart-monitor vhost\n"; }
+
+          location / {
+            proxy_pass         http://127.0.0.1:5003;
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_http_version 1.1;
+            proxy_set_header   Connection "";
+            proxy_buffering    off;    # critical for SSE/streaming
+            proxy_read_timeout 1h;
+          }
+        }
+
+        Enable & reload:
+            sudo ln -sf /etc/nginx/sites-available/smart-monitor.conf /etc/nginx/sites-enabled/smart-monitor.conf
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo nginx -t && sudo systemctl reload nginx
+
+7) Cloudflare Tunnel (public URL, no open ports)
+    Install & login:
+        wget -q wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared-linux-amd64.deb
+        cloudflared tunnel login
+
+    Create tunnel & DNS route:
+        cloudflared tunnel create smart-monitor
+        cloudflared tunnel list            # note TUNNEL UUID
+        cloudflared tunnel route dns smart-monitor smart-monitor.anselemokeke.dpdns.org
+
+    Move creds and start service:
+        sudo mkdir -p /etc/cloudflared
+        sudo cp ~/.cloudflared/<TUNNEL_UUID>.json /etc/cloudflared/
+        sudo chown root:root /etc/cloudflared/<TUNNEL_UUID>.json
+        sudo chmod 600 /etc/cloudflared/<TUNNEL_UUID>.json
+
+        sudo cloudflared service install
+        sudo systemctl enable --now cloudflared
+        journalctl -u cloudflared -n 50 --no-pager
+
+    Public test:
+        curl -I smart-monitor.anselemokeke.dpdns.org
+        # You should see 200/302 and often your X-Debug header.
+
+        Cloudflare Access (optional, recommended): Use Zero-Trust → Access to require SSO/OTP/IP rules before the
+        request even reaches your server (nicer than Basic Auth).
+
+8) App-Side Hardening (Flask)
+    Rate limiting (Flask-Limiter):
+
+        from flask_limiter import Limiter
+        from flask_limiter.util import get_remote_address
+
+        def create_app():
+            app = Flask(__name__)
+            limiter = Limiter(get_remote_address, app=app, default_limits=[])
+            from .routes_api import api_bp
+            limiter.limit("30/minute")(api_bp)  # baseline; adjust per-route as needed
+            app.register_blueprint(api_bp, url_prefix="/api")
+            ...
+            return app
+
+                CORS: keep same-origin (do not enable wide CORS).
+                Custom error pages: 404/500 templates that don’t leak stack traces; DEBUG=False in prod.
+                Logging: emit to stdout for journald or rotate with files.
+
+9) Security Checklist
+    Gunicorn bound to 127.0.0.1 (or a Unix socket).
+    NGINX adds security headers + SSE settings.
+    HTTPS at the edge (Cloudflare) or with certbot if directly exposed.
+    Auth: Cloudflare Access or NGINX Basic Auth (don’t go public without protection).
+    Rate limits on /api/*.
+    Firewall: You can deny inbound 80/443 on the VM when using a tunnel.
+    systemd sandboxing: NoNewPrivileges, ProtectSystem=full, minimal ReadWritePaths.
+
+10) Verification Commands
+    # Processes up?
+    systemctl status smart-monitor-gui smart-monitor-orchestrator nginx cloudflared --no-pager
+
+    # Gunicorn listening?
+    ss -ltnp | awk '$4 ~ /:5003$/'
+
+    # NGINX routing the right vhost?
+    curl -I -H 'Host: smart-monitor.anselemokeke.dpns.org' http://127.0.0.1/whoami
+
+    # End to end via Cloudflare:
+    curl -I https://smart-monitor.anselemokeke.dpns.org
+
+    # Logs
+    journalctl -u smart-monitor-gui -n 100 --no-pager
+    journalctl -u smart-monitor-orchestrator -n 100 --no-pager
+    journalctl -u nginx -n 100 --no-pager
+    journalctl -u cloudflared -n 100 --no-pager
+
+
+
+
+How to use postinstall.sh and enable-service.sh:
+
+        # 1) Post-install (packages, copy code, venv, deps, gunicorn.conf.py, env, DB)
+        sudo bash deploy/scripts/postinstall.sh
+
+        # 2) Enable services + nginx (Cloudflare Tunnel mode by default)
+        #    Customize host header (used only for local curls/headers)
+        sudo HOST_HEADER=smart-monitor.anselmokeke.dpdns.org bash deploy/scripts/enable-services.sh
+
+want the script to also write Cloudflare config:
+
+        # After you've created the tunnel and know the UUID
+        sudo CF_WRITE_CONFIG=yes \
+             CF_TUNNEL_UUID=<your-tunnel-uuid> \
+             CF_HOSTNAME=smart-monitor.anselmokeke.dpdns.org \
+             bash deploy/scripts/enable-services.sh
+
+        # Copy the tunnel credential and start service:
+        sudo cp ~/.cloudflared/<your-tunnel-uuid>.json /etc/cloudflared/
+        sudo chown root:root /etc/cloudflared/<your-tunnel-uuid>.json
+        sudo chmod 600 /etc/cloudflared/<your-tunnel-uuid>.json
+        sudo systemctl enable --now cloudflared
+
+Quick verification
+
+        # services
+        systemctl status smart-monitor-gui smart-monitor-orchestrator nginx --no-pager
+
+        # gunicorn bind
+        ss -ltnp | awk '$4 ~ /:5003$/'
+
+        # nginx vhost is the proxy (shows debug marker)
+        curl -I -H 'Host: smart-monitor.anselmokeke.dpdns.org' http://127.0.0.1/whoami
+
+        # end-to-end via Cloudflare (once tunnel is set)
+        curl -I https://smart-monitor.anselmokeke.dpdns.org
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
