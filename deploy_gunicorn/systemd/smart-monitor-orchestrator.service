@@ -1,0 +1,23 @@
+#/etc/systemd/system/smart-monitor-orchestrator.service
+
+[Unit]
+Description=Smart Monitor Orchestrator (collectors & jobs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=smartmon
+Group=smartmon
+WorkingDirectory=/opt/Smart-Monitor
+EnvironmentFile=-/etc/smart-monitor/env
+ExecStart=/usr/bin/python3 /opt/Smart-Monitor/main.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/smart-monitor
+
+[Install]
+WantedBy=multi-user.target

@@ -42,8 +42,6 @@
 #     create_app().run(host="0.0.0.0", port=5000, debug=True)
 
 
-# app.py
-# app.py
 import os, subprocess, secrets
 from datetime import datetime
 from flask import Flask
@@ -52,10 +50,10 @@ from .views import ui_bp
 from dotenv import load_dotenv
 from gui import config
 
-# Load /etc/smart-monitor/env if present; don't override real env
-load_dotenv("/etc/smart-monitor/env", override=False)
-# (optional) also load a local .env during dev
-load_dotenv(".env", override=False)
+# # Load /etc/smart-monitor/env if present; don't override real env
+# load_dotenv("/etc/smart-monitor/env", override=False)
+# # (optional) also load a local .env during dev
+# load_dotenv(".env", override=False)
 
 
 def _git_sha():
@@ -72,6 +70,9 @@ def _git_sha():
 
 def create_app():
     app = Flask(__name__)
+
+    # limiter = Limiter(get_remote_address, app=app, default_limits=[])
+    # limiter.limit("30/minute")(api_bp)
 
     app.config['SECRET_KEY'] = os.getenv('SMARTMON_SECRET_KEY') or secrets.token_hex(32)
 

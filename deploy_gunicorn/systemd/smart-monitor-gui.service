@@ -1,0 +1,54 @@
+#/etc/systemd/system/smart-monitor-gui.service
+
+[Unit]
+Description=Smart Monitor GUI (Gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/vagrant/Smart-Monitor
+EnvironmentFile=-/etc/smart-monitor/env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/vagrant/Smart-Monitor
+ExecStart=/usr/local/bin/gunicorn -c /vagrant/Smart-Monitor/gui/gunicorn.conf.py 'gui.app:create_app()'
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/smart-monitor
+
+[Install]
+WantedBy=multi-user.target
+
+
+#------------OR-----------------------
+
+
+[Unit]
+Description=Smart Monitor GUI (Gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=smartmon
+Group=smartmon
+WorkingDirectory=/opt/Smart-Monitor
+EnvironmentFile=-/etc/smart-monitor/env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/Smart-Monitor
+ExecStart=/opt/Smart-Monitor/gui/.venv/bin/gunicorn \
+  -c /opt/Smart-Monitor/gui/gunicorn.conf.py 'gui.app:create_app()'
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/smart-monitor
+
+[Install]
+WantedBy=multi-user.target

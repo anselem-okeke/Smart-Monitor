@@ -1,0 +1,10 @@
+bind = "127.0.0.1:5003"
+workers = 2
+threads = 4
+timeout = 60
+graceful_timeout = 30
+keepalive = 30
+worker_class = "gthread"
+accesslog = "-"
+errorlog = "-"
+loglevel = "info"
