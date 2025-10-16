@@ -48,7 +48,18 @@ def has_priv() -> bool:
     return False
 
 def has_powershell() -> bool:
-    return shutil.which("powershell") is not None
+    return shutil.which("powershell") is not None or shutil.which("pwsh") is not None
+
+def _ps(cmd: str, timeout=600) -> int:
+    # Run PowerShell without profile; return exit code only
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd],
+        capture_output=True, text=True, timeout=timeout
+    ).returncode
+
+def _bytes_free(drive="C:\\") -> int:
+    total, used, free = shutil.disk_usage(drive)
+    return free
 
 def free_disk_space_linux() -> int:
     freed = 0
@@ -90,37 +101,115 @@ def free_disk_space_linux() -> int:
     return freed  # size calc skipped for brevity
 
 
-def free_disk_space_windows() -> int:
-    #simulate temporay disk_usage
+def free_disk_space_windows(drive="C:\\") -> int:
+    # simulate temporay disk_usage
     # $f = "fillme.img"
     # fsutil file createnew $f 54000000000
+    """
+    Aggressive Windows cleanup. Requires Administrator.
+    Cleans: all users' TEMP, C:\\Windows\\Temp, Recycle Bin (all drives),
+            Windows Update cache, Delivery Optimization cache,
+            optional DISM component cleanup, deletes old shadow copies.
+    Returns: bytes freed (non-negative int).
+    """
     if platform.system() != "Windows" or not has_powershell():
-        print("[SKIP] not a windows system or powershell not found")
+        print("[SKIP] Not Windows or PowerShell not found")
         return 0
 
-    print("[INFO] Starting windows disk cleanup...")
-    freed = 0
+    before = _bytes_free(drive)
+    print(f"[INFO] Disk cleanup on {drive}… free before: {before/1e9:.2f} GB")
+
+    # PowerShell script (errors are ignored per step to keep going)
+    ps_script = r"""
+        $ErrorActionPreference = 'SilentlyContinue'
+        
+        # --- Clear %TEMP% for all user profiles ---
+        Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' |
+          ForEach-Object {
+            $p = (Get-ItemProperty $_.PsPath).ProfileImagePath
+            if (Test-Path $p) {
+              $tmp = Join-Path $p 'AppData\Local\Temp'
+              if (Test-Path $tmp) { Remove-Item -Path "$tmp\*" -Recurse -Force -ErrorAction SilentlyContinue }
+            }
+          }
+        
+        # --- Clear system TEMP ---
+        if (Test-Path $env:SystemRoot\Temp) { Remove-Item "$env:SystemRoot\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue }
+        
+        # --- Empty Recycle Bin (all drives) ---
+        try { Clear-RecycleBin -Force -ErrorAction SilentlyContinue } catch {}
+        
+        # --- Stop Windows Update/BITS, clear SoftwareDistribution and catroot2, then restart ---
+        $svc = @('wuauserv','bits')
+        foreach ($s in $svc) { try { Stop-Service $s -Force -ErrorAction SilentlyContinue } catch {} }
+        Start-Sleep -Seconds 2
+        try { Remove-Item "$env:SystemRoot\SoftwareDistribution\Download\*" -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+        try { Remove-Item "$env:SystemRoot\System32\catroot2\*" -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+        foreach ($s in $svc) { try { Start-Service $s -ErrorAction SilentlyContinue } catch {} }
+        
+        # --- Delivery Optimization cache ---
+        try {
+          $docache = "$env:ProgramData\Microsoft\Windows\DeliveryOptimization\Cache"
+          if (Test-Path $docache) { Remove-Item "$docache\*" -Recurse -Force -ErrorAction SilentlyContinue }
+        } catch {}
+        
+        # --- (Optional) Component Store cleanup (WinSxS). Non-destructive StartComponentCleanup ---
+        try { Dism.exe /Online /Cleanup-Image /StartComponentCleanup | Out-Null } catch {}
+        
+        # --- Delete all old restore points/shadow copies (irreversible!) ---
+        try { vssadmin delete shadows /All /Quiet | Out-Null } catch {}
+        """
 
     try:
-        #show what is in %TEMP
-        print("[INFO] Show what is in TEMP folder...")
-        # Show what's in %TEMP%
-        subprocess.call(["powershell", "-Command", "Get-ChildItem -Path $env:TEMP"])
+        rc = _ps(ps_script, timeout=900)
+        if rc != 0:
+            print(f"[WARN] PowerShell cleanup returned code {rc}")
+    except subprocess.TimeoutExpired:
+        print("[WARN] PowerShell cleanup timed out")
 
-        # Clear %TEMP%
-        print("[INFO] Cleaning TEMP folder...")
-        subprocess.call(["powershell","-Command",
-                         "Remove-Item -Path $env:TEMP\\* -Recurse -Force -ErrorAction SilentlyContinue"
-                         ])
+    # Optional: disable hibernation (removes hiberfil.sys) – uncomment if desired
+    # _ps('powercfg -h off')
 
-        # Empty recycle bin
-        subprocess.call(["powershell","-Command",
-                         "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"
-                         ])
-    except Exception as e:
-        print(f"[ERROR] Windos cleanup failed: {e}")
-    time.sleep(1)
+    # Give the filesystem a moment to settle
+    time.sleep(2)
+
+    after = _bytes_free(drive)
+    freed = max(0, after - before)
+    print(f"[INFO] Cleanup done. Free after: {after/1e9:.2f} GB (+{freed/1e9:.2f} GB)")
     return freed
+
+
+# def free_disk_space_windows() -> int:
+#     #simulate temporay disk_usage
+#     # $f = "fillme.img"
+#     # fsutil file createnew $f 54000000000
+#     if platform.system() != "Windows" or not has_powershell():
+#         print("[SKIP] not a windows system or powershell not found")
+#         return 0
+#
+#     print("[INFO] Starting windows disk cleanup...")
+#     freed = 0
+#
+#     try:
+#         #show what is in %TEMP
+#         print("[INFO] Show what is in TEMP folder...")
+#         # Show what's in %TEMP%
+#         subprocess.call(["powershell", "-Command", "Get-ChildItem -Path $env:TEMP"])
+#
+#         # Clear %TEMP%
+#         print("[INFO] Cleaning TEMP folder...")
+#         subprocess.call(["powershell","-Command",
+#                          "Remove-Item -Path $env:TEMP\\* -Recurse -Force -ErrorAction SilentlyContinue"
+#                          ])
+#
+#         # Empty recycle bin
+#         subprocess.call(["powershell","-Command",
+#                          "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"
+#                          ])
+#     except Exception as e:
+#         print(f"[ERROR] Windos cleanup failed: {e}")
+#     time.sleep(1)
+#     return freed
 
 def cleanup_disk(row, crit_th=95) -> bool:
     """

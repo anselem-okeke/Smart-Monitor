@@ -4,7 +4,23 @@ import os, urllib.parse, requests
 from flask import request, redirect, url_for, flash
 
 API_KEY = os.getenv("SMARTMON_API_KEY")
-INTERNAL_API = os.getenv("SMARTMON_INTERNAL_API", "http://127.0.0.1:5000")  # <— settable, safe default
+INTERNAL_API = os.getenv("SMARTMON_INTERNAL_API", "")  # <— settable, safe default
+
+def api_base():
+    """
+    | Setting                 | Where requests go                          | Pros                                      | Cons                                     |
+    | ----------------------- | ------------------------------------------ | ----------------------------------------- | ---------------------------------------- |
+    | unset (same-origin)     | Public hostname → Cloudflare Tunnel → back | Simple; matches browser path              | Hairpin out & back; slower; needs egress |
+    | `http://127.0.0.1`      | Nginx (local) → Gunicorn                   | Local, fast; keeps Nginx logs/rate-limits | None for your setup                      |
+    | `http://127.0.0.1:5003` | Gunicorn direct                            | Local, fastest                            | Skips Nginx protections/logs             |
+
+    :return:
+    """
+    if INTERNAL_API:
+        return INTERNAL_API.rstrip("/")
+    # build from the incoming request (http(s)://host[:port])
+    return request.host_url.rstrip("/")
+
 
 @ui_bp.get("/services")
 def services_view():
@@ -16,7 +32,7 @@ def services_view():
 def service_restart_ui(host, service):
     service = urllib.parse.unquote(service)
     minutes = request.args.get("minutes", 1440)
-    url = f"{INTERNAL_API.rstrip('/')}/api/services/restart"
+    url = f"{api_base()}/api/services/restart"
 
     try:
         r = requests.post(

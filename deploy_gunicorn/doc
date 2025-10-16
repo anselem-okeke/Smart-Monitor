@@ -375,6 +375,19 @@ Quick verification
         curl -I https://smart-monitor.anselmokeke.dpdns.org
 
 
+Recommended:
+    use Nginx locally (keeps logs, headers, rate-limits)
+        sudo nano /etc/smart-monitor/env
+        # make it look like this (one line only):
+        SMARTMON_INTERNAL_API=http://127.0.0.1
+
+    When would you use :5003 instead?
+        Only if you intentionally want to bypass Nginx and talk straight to Gunicorn. That’s a tiny bit faster,
+        but you lose Nginx’s access logs and rate-limits on those internal calls.
+        So: remove or comment out the :5003 line, keep the http://127.0.0.1 line, restart the GUI service.
+
+
+
 
 
 

@@ -333,6 +333,9 @@ def attempt_service_recovery():
     platform_name = platform.system()
     approved_services = load_approved_services()
 
+    # rows = db_access_for_service_recovery()
+    # print("[DEBUG] type of first row:", type(rows[0]).__name__, rows[0] if rows else None)
+
     for service_name, status, hostname, sub_state, service_type, unit_file_state, recoverable in db_access_for_service_recovery():
 
         if status not in ("stopped", "failed"):
@@ -392,7 +395,7 @@ def attempt_service_recovery():
 
         if success:
             print(f"[INFO] Successfully restarted {service_name}: {msg}")
-            mark_service_running(service_name, hostname, platform_name)
+            #mark_service_running(service_name, hostname, platform_name)
         else:
             print(f"[ERROR] Failed to restart {service_name}: {msg}")
             log_alert({

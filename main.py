@@ -46,6 +46,16 @@ HOSTNAME = socket.gethostname()
 CFG_PATH = pathlib.Path(__file__).resolve().parents[0] / "config/metrics_recovery.json"
 CFG = json.load(open(CFG_PATH))
 
+import os, sys
+if os.name == "nt":
+    try:
+        # Prefer robust UTF-8 output; avoid crashes on odd consoles
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception as e:
+        print(f"{e}")
+        pass
+
 class SafeExtraFormatter(logging.Formatter):
     def format(self, record):
         # make sure fields used in format string exist
@@ -196,7 +206,8 @@ def run_fn(fn, q):
     try:
         fn()
         q.put(("ok", None))
-    except Exception:
+    except Exception as a:
+        print(f"{a}")
         q.put(("err", traceback.format_exc()))
 
 def run_handler_with_timeout(name, fn, timeout_sec):
@@ -231,14 +242,34 @@ def run_handler(name, fn):
         dur = time.time() - start
         log.error(f"{name} FAILED ({dur:.2f}s) err={e}\n{traceback.format_exc()}")
 
+def _using_pg():
+    dsn = os.getenv("DATABASE_URL", "")
+    return dsn.startswith(("postgres://", "postgresql://"))
+
+
 def main():
-    db_path, created, filled = ensure_db_initialized()
-    if created:
-        log.info(f"DB created and initialized at {db_path}")
-    elif filled:
-        log.info(f"DB at {db_path} was missing tables; created: {filled}")
+    # db_path, created, filled = ensure_db_initialized()
+    # if created:
+    #     log.info(f"DB created and initialized at {db_path}")
+    # elif filled:
+    #     log.info(f"DB at {db_path} was missing tables; created: {filled}")
+    # else:
+    #     log.info(f"DB ready at {db_path}")
+
+    # only initialize (or check) when starting; safe for both backends
+    target, created, info = ensure_db_initialized()
+    if _using_pg():
+        if created:
+            log.info(f"Postgres schema applied at {target}")
+        if info:
+            log.info(f"PG tables created/missing before: {info}")
     else:
-        log.info(f"DB ready at {db_path}")
+        if created:
+            log.info(f"SQLite DB created at {target}")
+        elif info:
+            log.info(f"SQLite tables created: {info}")
+        else:
+            log.info(f"SQLite DB ready at {target}")
 
     apply_env_overrides()
     log.info("orchestrator starting… (Ctrl+C to stop)")

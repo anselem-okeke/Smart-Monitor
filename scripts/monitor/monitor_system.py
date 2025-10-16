@@ -68,7 +68,7 @@ def get_temperature():
     return None
 
 def get_load_average():
-    return f"Not Available" if platform.system() == "Windodows" else psutil.getloadavg()[0]
+    return f"Not Available" if platform.system() == "Windows" else psutil.getloadavg()[0]
 
 def get_disk_usage():
     if platform.system() == "Windows":

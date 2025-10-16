@@ -222,7 +222,8 @@ def parse_health_model_temp(output: str):
     if m:
         try:
             temp_c = float(m.group(1))
-        except Exception:
+        except Exception as e:
+            print(f"{e}")
             temp_c = None
 
     # Ignore bogus 0°C on virtual/unsupported devices

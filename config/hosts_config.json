@@ -6,6 +6,13 @@
    {
     "target": "8.8.8.8",
     "method": "traceroute"
+  },
+    {
+    "target": "gitlab.com",
+    "method": "nslookup"
+  },
+  {
+    "target": "fake9876543210notrealexample.com",
+    "method": "traceroute"
   }
 ]
-

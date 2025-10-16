@@ -1,0 +1,329 @@
+multi-stage builds, non-root, tiny images, SSE-friendly proxy, least privilege, and clean separation of concerns.
+Content:
+    .dockerignore
+    Multi-stage Dockerfile (one image used by both GUI and orchestrator)
+    docker-compose.yml with three services:
+        app (Flask via Gunicorn)
+        orchestrator (main.py collectors)
+        nginx (reverse proxy with SSE settings)
+        Hardened container settings (non-root, read-only FS, dropped caps, healthchecks)
+        Optional: Cloudflare Tunnel container to keep no open ports
+
+Dockerfile (multi-stage, tiny, non-root, reproducible)
+    # ---------- Stage 1: build wheels ----------
+    FROM python:3.11-slim AS builder
+
+    ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+        PIP_NO_CACHE_DIR=1 \
+        PYTHONDONTWRITEBYTECODE=1
+
+    # System deps required to build wheels for some libs (keep minimal)
+    RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential gcc libffi-dev \
+     && rm -rf /var/lib/apt/lists/*
+
+    WORKDIR /src
+
+    # Copy and sanitize requirements (fix BOM etc.) before install
+    COPY requirements.txt /src/requirements.txt
+
+    # Build wheels offline-installable
+    RUN python -m pip install --upgrade pip wheel setuptools \
+     && python -m pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+
+    # ---------- Stage 2: runtime ----------
+    FROM python:3.11-slim AS runtime
+
+    # Security-minded defaults
+    ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+        PIP_NO_CACHE_DIR=1 \
+        PYTHONDONTWRITEBYTECODE=1 \
+        PYTHONUNBUFFERED=1
+
+    # Create non-root user
+    ARG APP_UID=10001
+    RUN useradd -u ${APP_UID} -m -s /usr/sbin/nologin appuser
+
+    # Minimal OS packages (for sqlite and tzdata/logging)
+    RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates tzdata curl \
+     && rm -rf /var/lib/apt/lists/*
+
+    WORKDIR /app
+
+    # Install wheels produced in builder
+    COPY --from=builder /wheels /wheels
+    RUN python -m pip install --upgrade pip \
+     && python -m pip install --no-index --find-links=/wheels /wheels/*
+
+    # Copy source code (only what we need)
+    # repo layout assumed:
+    # /app/gui/...
+    # /app/main.py
+    # /app/config/...
+    COPY gui /app/gui
+    COPY config /app/config
+    COPY main.py /app/main.py
+
+    # Make package import explicit
+    RUN touch /app/gui/__init__.py
+
+    # Gunicorn config (baked-in default; you can mount your own to override)
+    COPY deploy/gunicorn/gunicorn.conf.py /app/gui/gunicorn.conf.py 2>/dev/null || true
+
+    # App runtime env (defaults; override at runtime)
+    ENV DB_PATH=/data/smart_factory_monitor.db \
+        FLASK_ENV=production
+
+    # Data dir for SQLite (separate, mounted volume)
+    RUN mkdir -p /data && chown -R appuser:appuser /data
+
+    # Expose internal port (nginx upstream)
+    EXPOSE 8000
+
+    # Drop privileges
+    USER appuser
+
+    # Healthcheck hits app's /api/healthz via Gunicorn port (not nginx)
+    HEALTHCHECK --interval=30s --timeout=3s --retries=5 CMD curl -fsS http://127.0.0.1:8000/api/healthz || exit 1
+
+    # Default command is the web app via gunicorn
+    # Orchestrator will override CMD in compose using the same image
+    CMD ["gunicorn", "-c", "gui/gunicorn.conf.py", "gui.app:create_app()"]
+
+
+Notes
+    Single image used by both GUI and orchestrator → same deps, fewer layers to manage.
+    on-root appuser + no shell.
+    Healthcheck makes orchestrator independent (no healthcheck there).
+    Default Gunicorn bind/other tunables are set via config file below.
+
+Create deploy/gunicorn/gunicorn.conf.py (used by the container):
+    # Bind to all inside the container; nginx will talk to 8000
+    bind = "0.0.0.0:8000"
+
+    # Conservative defaults; tune by CPU
+    workers = 2
+    threads = 4
+    worker_class = "gthread"
+
+    # Timeouts (SSE tolerant)
+    timeout = 60
+    graceful_timeout = 30
+    keepalive = 30
+
+    # Logs to stdout for docker logs
+    accesslog = "-"
+    errorlog = "-"
+    loglevel = "info"
+
+nginx.conf for SSE & security headers Create deploy/nginx/smart-monitor.conf:
+    user  nginx;
+    worker_processes  auto;
+
+    events { worker_connections 1024; }
+
+    http {
+      # sane defaults
+      sendfile on;
+      include       mime.types;
+      default_type  application/octet-stream;
+
+      # upstream to app container
+      upstream app_upstream {
+        server app:8000;   # service name from compose
+        keepalive 64;
+      }
+
+      server {
+        listen 8080;     # inside container
+        server_name _;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'" always;
+
+        # Optional: quick probe
+        location = /whoami {
+          add_header Content-Type text/plain;
+          return 200 "nginx smart-monitor proxy\n";
+        }
+
+        # Proxy all to app
+        location / {
+          proxy_pass http://app_upstream;
+          proxy_set_header Host              $host;
+          proxy_set_header X-Real-IP         $remote_addr;
+          proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+
+          # SSE-friendly
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+          proxy_buffering off;
+          proxy_read_timeout 1h;
+        }
+      }
+    }
+    This nginx runs on port 8080 inside its container; on the host you can publish
+    80/443 (or front it with Cloudflare Tunnel).
+
+docker-compose.yml (hardened) Create docker-compose.yml in repo root:
+    version: "3.9"
+
+    services:
+      app:
+        build:
+          context: .
+          dockerfile: Dockerfile
+        image: smart-monitor:latest
+        container_name: smartmon-app
+        environment:
+          FLASK_ENV: production
+          DB_PATH: /data/smart_factory_monitor.db
+          # Keep server-side calls local through nginx (optional)
+          SMARTMON_INTERNAL_API: http://nginx:8080
+          # SECRET examples (inject via env/secret manager in real prod)
+          # SMARTMON_API_KEY: "${SMARTMON_API_KEY}"
+        healthcheck:
+          test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/healthz"]
+          interval: 30s
+          timeout: 3s
+          retries: 5
+        read_only: true
+        tmpfs:
+          - /tmp
+          - /run
+        security_opt:
+          - no-new-privileges:true
+        cap_drop: [ "ALL" ]
+        restart: unless-stopped
+        networks:
+          - smartnet
+        volumes:
+          - smart-data:/data:rw
+
+      orchestrator:
+        image: smart-monitor:latest
+        container_name: smartmon-orchestrator
+        command: ["python", "/app/main.py"]
+        environment:
+          DB_PATH: /data/smart_factory_monitor.db
+        depends_on:
+          app:
+            condition: service_healthy
+        read_only: true
+        tmpfs:
+          - /tmp
+          - /run
+        security_opt:
+          - no-new-privileges:true
+        cap_drop: [ "ALL" ]
+        restart: unless-stopped
+        networks:
+          - smartnet
+        volumes:
+          - smart-data:/data:rw
+
+      nginx:
+        image: nginx:1.27-alpine
+        container_name: smartmon-nginx
+        depends_on:
+          app:
+            condition: service_healthy
+        ports:
+          - "80:8080"        # host:container (HTTP). For TLS, front with CF Tunnel or add certs.
+          # - "443:8443"     # (optional) if you add your own TLS listener
+        volumes:
+          - ./deploy/nginx/smart-monitor.conf:/etc/nginx/nginx.conf:ro
+        read_only: true
+        tmpfs:
+          - /var/cache/nginx
+          - /var/run
+          - /tmp
+        security_opt:
+          - no-new-privileges:true
+        cap_drop: [ "ALL" ]
+        restart: unless-stopped
+        networks:
+          - smartnet
+
+      # Optional: Cloudflare Tunnel container (no open inbound ports needed)
+      # cloudflared:
+      #   image: cloudflare/cloudflared:latest
+      #   command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+      #   environment:
+      #     - TUNNEL_TRANSPORT_PROTOCOL=http2
+      #   depends_on:
+      #     - nginx
+      #   restart: unless-stopped
+      #   networks:
+      #     - smartnet
+
+    volumes:
+      smart-data:
+
+    networks:
+      smartnet:
+        driver: bridge
+
+Why this is secure / production-ish
+    Non-root app process; read-only root FS; tmpfs for /tmp & /runn
+    Drop all Linux capabilities + no-new-privileges.
+    Separate orchestrator and app (same image, different commands).
+    Healthcheck on the app.
+    Nginx does SSE-safe proxying and security headers.
+    SQLite persists on a named volume smart-data.
+    un-comment the cloudflared service if preferable and provide CLOUDFLARE_TUNNEL_TOKEN
+    (Zero Trust → Tunnels → “One-click deploy” gives you a token). Then don’t need to expose host port 80 at all.
+
+Bring it UP:
+    # Build image
+    docker compose build
+
+    # Run stack
+    docker compose up -d
+
+    # Check health
+    docker compose ps
+    docker logs -f smartmon-app
+    docker logs -f smartmon-nginx
+
+    # Hit locally
+    curl -I http://localhost/whoami
+    curl -I http://localhost/
+
+If using Cloudflare Tunnel container:
+    Create a Tunnel in CF Zero-Trust; get a token; set env CLOUDFLARE_TUNNEL_TOKEN.
+    Map your hostname to http://nginx:8080 in Cloudflare’s config UI; or use a route for the tunnel.
+    Remove ports: ["80:8080"] from nginx if you want zero open ports.
+
+Tuning & options:
+    Gunicorn workers: rule of thumb workers = 2 * CPU + 1 (for gthread, threads=4–8 is common).
+    Adjust in deploy/gunicorn/gunicorn.conf.py.
+    Rate limiting: you already have Flask-Limiter; add nginx rate limits if you want IP-level
+    throttling in front.
+    CSP: tighten to your exact asset needs.
+        TLS:
+            With Cloudflare in front, keep nginx HTTP-only internally.
+            If terminating TLS in nginx, add another server block and mount certs.
+        Postgres later: swap DB_PATH to a DSN; add a postgres service; mount secrets.
+
+Troubleshooting:
+    Welcome to nginx page: means nginx isn’t using config. Ensure deploy/nginx/smart-monitor.conf
+    to /etc/nginx/nginx.conf (as in compose) is mounted.
+    502 from nginx: app isn’t healthy yet; docker logs smartmon-app; verify it’s on 0.0.0.0:8000.
+    SSE stalls: double-check proxy_buffering off; and long proxy_read_timeout.
+    DB locked: ensure both containers write to same volume (smart-data) and you’ve enabled WAL in app init.
+    SQLite + multiple writers can be touchy; that’s your cue to move to Postgres when load rises.
+
+Optional: Tiny image variant (distroless)
+    For extra minimalism, switch the runtime to gcr.io/distroless/python3 and bake wheels fully static.
+    That removes shell and package manager entirely. Start setup first; distroless is a later optimization.
+
+
+
+
+

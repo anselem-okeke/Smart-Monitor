@@ -1,0 +1,833 @@
+Install Postgres on the Vagrant VM (Ubuntu/Debian)
+    # On the VM that will host the DB
+    sudo apt-get update
+    sudo apt-get install -y postgresql postgresql-contrib
+
+    # Verify
+    sudo -u postgres psql -c "SELECT version();"
+
+Create DB, user, and grants
+    # enter psql as the postgres superuser
+    sudo -u postgres psql
+
+    -- inside psql:
+    CREATE DATABASE smartdb;
+    CREATE USER smart WITH ENCRYPTED PASSWORD 'smartpass';
+
+    -- Let the user connect and own objects in this DB
+    GRANT ALL PRIVILEGES ON DATABASE smartdb TO smart;
+
+    \c smartdb
+    -- Future proof: allow default privileges on future tables
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO smart;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO smart;
+
+    \q
+
+(Optional) Allow connections from other VMs/hosts, By default PG listens on localhost only.
+Change to listen on the VM’s private IP.
+    # find the VM IP you want to bind, e.g., 192.168.56.11
+    ip a | grep -Eo 'inet 192\.168\.[0-9]+\.[0-9]+' | awk '{print $2}'
+    EDIT: sudo sed -i "s/^#*listen_addresses.*/listen_addresses = '*'/g" /etc/postgresql/*/main/postgresql.conf
+
+    Allow your orchestrator/GUI IPs in pg_hba.conf (replace the CIDR as needed; 192.168.56.0/24 is Vagrant’s
+    common host-only network):
+        echo "host    smartdb     smart     192.168.56.0/24      md5" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
+
+        Restart:
+            sudo systemctl restart postgresql
+            sudo systemctl status postgresql --no-pager
+
+    Create tables in Postgres (your schema) and apply it:
+        Create tables in Postgres (your schema)
+
+    Install the driver on each machine that runs your Python services:
+        pip install "psycopg[binary]"
+        DATABASE_URL=postgresql://smart:smartpass@<PG_VM_IP>:5432/smartdb
+
+    Quick sanity checks:
+        # check TCP reachability
+        nc -zv <PG_VM_IP> 5432
+
+        # quick Python probe (on any client where psycopg is installed)
+        python - <<'PY'
+        import os, psycopg
+        dsn = os.environ.get("DATABASE_URL", "postgresql://smart:smartpass@192.168.56.11:5432/smartdb")
+        with psycopg.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;"); print("OK:", cur.fetchone())
+        PY
+
+Windows orchestrator writing straight to the Postgres DB on the Linux VM.
+On Windows (where the service runs):
+    # If not installed:
+    python --version
+    pip --version
+
+    # Orchestrator deps (safe to re-run)
+    pip install psutil requests "psycopg[binary]"
+
+    psycopg[binary] provides a prebuilt Postgres client that works well on Windows + Python 3.13.
+
+On the Linux VM (Postgres host):
+    /etc/postgresql/<ver>/main/postgresql.conf:
+        listen_addresses = '*'
+
+    /etc/postgresql/<ver>/main/pg_hba.conf:
+        # allow the Windows host IP to connect as user smart to DB smartdb
+        host    smartdb   smart   <WIN_HOST_IP>/32   md5
+
+    Open firewall (if using ufw):
+        sudo ufw allow 5432/tcp
+        sudo systemctl restart postgresql
+
+    Quick connectivity test from the Windows box (optional):
+        # Should say "Connection successful"
+        $env:DATABASE_URL = "postgresql://smart:smartpass@192.168.56.10:5432/smartdb"
+        python - <<'PY'
+        import os
+        from psycopg import connect
+        with connect(os.environ["DATABASE_URL"]) as c:
+            with c.cursor() as cur:
+                cur.execute("select version();")
+                print("Connection successful:", cur.fetchone()[0])
+        PY
+
+Blocked by PowerShell’s execution policy (unsigned script), issue with installing window service:
+    Run an elevated PowerShell and execute the script with a per-process bypass:
+        powershell -NoProfile -ExecutionPolicy Bypass -File ".\install_service2.ps1" -DbHost 192.168.56.11
+        or
+        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+        .\install_service2.ps1 -DbHost 192.168.56.11
+
+    Make it easier going forward (optional)
+        Allow locally created scripts for your user
+        Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+        (RemoteSigned means scripts downloaded from the internet still need a signature unless unblocked.)
+
+    After it runs, Confirm the service env vars were set:
+        nssm get SmartMonitor AppEnvironmentExtra
+        nssm restart SmartMonitor
+        Get-Content -Wait "C:\ProgramData\SmartMonitor\logs\smartmonitor.err.log"
+
+PG allows remote connections, On the Linux PG VM:
+    sudo ss -lntp | grep 5432 → should show 0.0.0.0:5432 or the VM IP.
+    sudo grep -E '^(listen_addresses|#listen_addresses)' /etc/postgresql/*/main/postgresql.conf
+        Ensure: listen_addresses = '*'
+    sudo grep -n 'pg_hba' /etc/postgresql/*/main/pg_hba.conf
+        Add (or ensure) a line for your Windows host/network:
+            host    smartdb   smart   192.168.56.0/24   scram-sha-256
+            sudo systemctl restart postgresql
+            sudo ufw allow 5432/tcp
+
+Basic TCP test from Windows
+    Test-NetConnection 192.168.56.11 -Port 5432
+        Must be TcpTestSucceeded : True.
+
+The service is using the right env, Confirm what NSSM stored:
+    nssm get SmartMonitor AppEnvironmentExtra
+        You should see a DATABASE_URL=postgresql://smart:smartpass@192.168.56.11:5432/smartdb or other env
+        (If PG enforces TLS or your network middlebox complains, try appending ?sslmode=prefer or ?sslmode=disable.)
+
+    Python deps on Windows (psycopg). The service uses the Python exe configured. Install deps with exact python:
+    # Use the same path you passed in install_service2.ps1
+    & "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe" -m pip install "psycopg[binary]" psutil
+
+    If the service log shows ModuleNotFoundError: psycopg or similar, this is the fix.
+        Tail the Windows service logs:
+            Get-Content -Wait "C:\ProgramData\SmartMonitor\logs\smartmonitor.err.log"
+            Get-Content -Wait "C:\ProgramData\SmartMonitor\logs\smartmonitor.out.log"
+            nssm restart SmartMonitor
+
+    Quick server-side verification queries
+        sudo -u postgres psql -d smartdb -c "SELECT COUNT(*) FROM system_metrics;"
+        sudo -u postgres psql -d smartdb -c "SELECT hostname, COUNT(*) FROM system_metrics GROUP BY hostname ORDER BY 2 DESC;"
+        sudo -u postgres psql -d smartdb -c "SELECT hostname, service_name, status FROM (
+          SELECT hostname, service_name, normalized_status AS status,
+                 ROW_NUMBER() OVER (PARTITION BY hostname, service_name ORDER BY ts_epoch DESC) rn
+          FROM service_status
+        ) x WHERE rn=1 AND hostname ~* 'win';"
+
+        If you see your Windows host there, you’re done
+
+TCP-connect Windows VM/Linux VM Issues:
+    ipconfig shows it already:
+        Ethernet → 10.0.2.15 (NAT)
+        Ethernet 2 → 169.254.34.173 (APIPA = no DHCP on that adapter)
+        That 169.254… is the host-only adapter that failed to get an IP. Give it an IP in the 192.168.56.0/24
+        network (same as the Linux VM) and it will work immediately.
+
+    Fix (Windows VM)
+    Assign a static IP on Ethernet 2
+    Control Panel → Network & Internet → Change adapter settings → Right-click Ethernet 2 → Properties → Internet Protocol Version 4 (TCP/IPv4) → Properties → Use the following IP address:
+        IP address: 192.168.56.10 (any free address in 192.168.56.0/24)
+        Subnet mask: 255.255.255.0
+        Default gateway: (leave blank)
+        DNS: (leave blank)
+        (Alternatively enable DHCP on the VirtualBox Host-Only network; static is quicker.)
+
+    Verify
+        ipconfig
+        Test-NetConnection 192.168.56.11 -Port 5432:
+            TcpTestSucceeded : True should appear, and SourceAddress should now be 192.168.56.10.
+
+Ensure Postgres allows this subnet (you likely already did):
+On the Linux VM:
+    # in /etc/postgresql/*/main/postgresql.conf
+    listen_addresses = '*'
+
+    # in /etc/postgresql/*/main/pg_hba.conf
+    host    smartdb   smart   192.168.56.0/24   scram-sha-256
+
+    sudo systemctl restart postgresql
+
+Fixing Network path Window/Linux
+On the Linux PG VM
+listen on all addresses. Double-check the two files and restart:
+    # postgresql.conf
+    sudo grep -E "^(listen_addresses|port)" /etc/postgresql/*/main/postgresql.conf
+    # should show: listen_addresses = '*'   and   port = 5432
+
+    # pg_hba.conf — allow the host-only subnet
+    sudo bash -lc 'grep -n "host .* 192\.168\.56\." /etc/postgresql/*/main/pg_hba.conf || true'
+    # If missing, append:
+    echo "host    all     all     192.168.56.0/24     md5" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
+
+    # firewall
+    sudo ufw allow from 192.168.56.0/24 to any port 5432
+
+    # reload
+    sudo systemctl restart postgresql
+    sudo ss -lntp | grep 5432   # expect 0.0.0.0:5432 and [::]:5432
+
+On the Windows VM
+    Test-NetConnection used SourceAddress 10.0.2.15 (NAT). must also be on the host-only network (192.168.56.0/24) to reach 192.168.56.11 directly.
+    Add/enable the Host-Only adapter on the Windows VM (same VirtualBox “Host-Only” network as the Linux VM).
+    Give it a static IP on that subnet (no gateway/DNS):
+
+        # Find the host-only NIC (name may be "Ethernet 2" etc.)
+        Get-NetIPInterface -AddressFamily IPv4 | Sort-Object InterfaceMetric | ft ifIndex,InterfaceAlias,AddressFamily,ConnectionState
+
+        # Replace 'Ethernet 2' with the host-only adapter's alias
+        $nic = "Ethernet 2"
+        # Remove any APIPA (169.254.x.x) address if present
+        Get-NetIPAddress -InterfaceAlias $nic -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+          ? {$_.IPAddress -like "169.254.*"} | Remove-NetIPAddress -Confirm:$false
+
+        # Assign 192.168.56.10/24 (pick any free .56.x)
+        New-NetIPAddress -InterfaceAlias $nic -IPAddress 192.168.56.10 -PrefixLength 24
+
+        Test-NetConnection 192.168.56.11 -Port 5432
+        # Expect: TcpTestSucceeded : True
+        # And SourceAddress should be 192.168.56.10 (not 10.0.2.15)
+
+    Verify the service has the right env and Python deps
+        # Env block (should show your DB URL)
+        nssm get SmartMonitor AppEnvironmentExtra
+
+        # Install psycopg in the SAME Python your service uses
+        & "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe" -m pip install --upgrade "psycopg[binary]" psutil requests
+
+    Quick smoke test from Windows (bypasses the service):
+        $env:DATABASE_URL = "postgresql://smart:smartpass@192.168.56.11:5432/smartdb?connect_timeout=5"
+        & "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe" - <<'PY'
+        import os, socket, psycopg
+        with psycopg.connect(os.environ["DATABASE_URL"]) as con:
+            with con.cursor() as cur:
+                cur.execute("INSERT INTO alerts(hostname,severity,source,message) VALUES (%s,'info','win-smoke','hello')", (socket.gethostname(),))
+                con.commit()
+        print("OK")
+        PY
+
+
+ERROR CASE:
+    Windows box still isn’t using the host-only NIC to reach Postgres.
+    Test-NetConnection shows:
+        InterfaceAlias : Ethernet (your NAT NIC, 10.0.2.15)
+        SourceAddress : 10.0.2.15
+        host-only IP added (192.168.56.10) shows AddressState : Tentative/Invalid → Windows won’t route with it.
+    That means either the host-only adapter isn’t actually up/bound to IPv4, or the IP is conflicting.
+        Do the following exactly:
+        Bring the Host-Only NIC up, give it a clean IP, prefer it for .56/24
+        Run in an elevated PowerShell:
+            # Pick the Host-Only adapter name (yours looked like "Ethernet 2")
+            $nic = "Ethernet 2"
+
+            # Make sure the adapter is enabled and IPv4 is bound
+            Enable-NetAdapter -Name $nic -Confirm:$false
+            Enable-NetAdapterBinding -InterfaceAlias $nic -ComponentID ms_tcpip
+
+            # Remove ANY existing IPv4s on it (including the bad Tentative/Invalid one)
+            Get-NetIPAddress -InterfaceAlias $nic -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+              Remove-NetIPAddress -Confirm:$false
+
+            # Give it a different, likely-free address (avoid conflicts)
+            New-NetIPAddress -InterfaceAlias $nic -IPAddress 192.168.56.30 -PrefixLength 24
+
+            # Prefer this NIC for routing (lower metric than the NAT NIC)
+            Set-NetIPInterface -InterfaceAlias $nic -InterfaceMetric 5
+
+            # Add an on-link route for the host-only subnet (persistent)
+            New-NetRoute -DestinationPrefix "192.168.56.0/24" -InterfaceAlias $nic -NextHop "0.0.0.0" -PolicyStore PersistentStore
+
+        Quick Checks:
+            Get-NetAdapter | ft Name,Status,IfIndex,LinkSpeed
+            Get-NetIPAddress -InterfaceAlias $nic -AddressFamily IPv4
+            route print 192.168.56
+
+        Result:
+            Adapter Status = Up
+            192.168.56.30 with AddressState = Preferred
+            A route for 192.168.56.0/24 via the $nic
+
+        Test Postgres reachability from the host-only IP:
+            Test-NetConnection 192.168.56.11 -Port 5432 -SourceAddress 192.168.56.30
+            Expected:
+                SourceAddress : 192.168.56.30
+                TcpTestSucceeded : True
+
+missing route for the 192.168.56.0/24 network.
+    On Windows build, New-NetRoute’s PolicyStore and Test-NetConnection -SourceAddress aren’t available,
+    so use the classic route.exe instead.
+        Add a persistent on-link route for 192.168.56.0/24, Use host-only interface index (IfIndex = 16 on “Ethernet 2”):
+            # Add a persistent route via the host-only NIC (192.168.56.30), IF 16
+            route -p add 192.168.56.0 mask 255.255.255.0 192.168.56.30 if 16
+
+            # Make sure the host-only NIC is preferred (lower metric) than the NAT NIC
+            Set-NetIPInterface -InterfaceAlias "Ethernet 2" -InterfaceMetric 5
+            Set-NetIPInterface -InterfaceAlias "Ethernet"   -InterfaceMetric 50
+                Confirm it’s there:
+                    route print 192.168.56
+                        You should now see an Active and Persistent route for 192.168.56.0/24 pointing to 192.168.56.30 on interface 16.
+
+    Smoke Test:
+        # 1) Set the env var for this test
+        $env:DATABASE_URL = "postgresql://smart:smartpass@192.168.56.11:5432/smartdb?connect_timeout=5"
+
+        # 2) Put the Python snippet in a here-string
+        $code = @'
+        import os, socket, psycopg
+        with psycopg.connect(os.environ["DATABASE_URL"]) as con:
+            with con.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO alerts(hostname,severity,source,message) VALUES (%s,'info','win-smoke','hello from win')",
+                    (socket.gethostname(),)
+                )
+                con.commit()
+        print("OK")
+        '@
+
+        # 3) Pipe it into python’s STDIN with "-"
+        $python = "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe"
+        $code | & $python -
+
+
+Windows NIC and IP look good, but TCP to 5432 is still failing. That means it’s either taking the wrong NIC (10.0.2.15)
+ or something on the Linux side is blocking the port. Do these in order; each step has the exact command you can paste.
+    1. Linux VM: double-check Postgres + firewall:
+        # Is Postgres really listening on all addrs?
+        sudo ss -lntp | grep 5432
+        # you should see: 0.0.0.0:5432 (you already do)
+
+        # Is UFW running? If yes, allow the host-only subnet
+        sudo ufw status
+        sudo ufw allow from 192.168.56.0/24 to any port 5432 proto tcp
+
+        # pg_hba.conf must allow your Windows subnet/login
+        sudo bash -lc 'grep -n "smartdb" -n /etc/postgresql/*/main/pg_hba.conf'
+        sudo bash -lc 'printf "\nhost    all    smart    192.168.56.0/24    scram-sha-256\n" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf'
+        sudo systemctl reload postgresql
+
+    2.Windows VM/host: make sure routing prefers Ethernet 2 (192.168.56.30)
+    already have the on-link route, but Windows is still sourcing from 10.0.2.15. Lower the interface metric
+    for Ethernet 2 and raise the NAT NIC’s metric so 192.168.56.x traffic uses Ethernet 2.
+        $nicHo = "Ethernet 2"   # 192.168.56.30
+        $nicNat = "Ethernet"    # 10.0.2.15
+
+        # Set interface metrics: smaller = preferred
+        Set-NetIPInterface -InterfaceAlias $nicHo  -InterfaceMetric 5
+        Set-NetIPInterface -InterfaceAlias $nicNat -InterfaceMetric 50
+
+        # Verify the on-link route exists on Ethernet 2
+        Get-NetRoute -DestinationPrefix "192.168.56.0/24" | ft DestinationPrefix,NextHop,InterfaceAlias,RouteMetric
+
+        # If you still don’t see it, (re)add a persistent on-link route:
+        # (Gateway = your own NIC IP to mark it on-link)
+        $ifIndex = (Get-NetAdapter -Name $nicHo).ifIndex
+        route delete 192.168.56.0 mask 255.255.255.0 > $null 2>&1
+        route add 192.168.56.0 mask 255.255.255.0 192.168.56.30 if $ifIndex -p
+
+    3.Windows: test that packets go out via 192.168.56.30
+        # Force ping from the host-only IP
+        ping -S 192.168.56.30 192.168.56.11
+
+        # Check TCP path and source address
+        Test-NetConnection 192.168.56.11 -Port 5432 -InformationLevel Detailed
+        # Look for: TcpTestSucceeded : True  AND  SourceAddress : 192.168.56.30
+            If TcpTestSucceeded is False: the route/metric still isn’t being used (repeat step 2).
+            If it’s True but Python still times out, the Linux firewall/pg_hba is still blocking (repeat step 1).
+
+    4.Quick Python smoke test (PowerShell)
+        $env:DATABASE_URL = "postgresql://smart:smartpass@192.168.56.11:5432/smartdb?connect_timeout=5"
+        $python = "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe"
+        $code = @'
+        import os, socket, psycopg
+        with psycopg.connect(os.environ["DATABASE_URL"]) as con:
+            with con.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO alerts(hostname,severity,source,message) VALUES (%s,'info','win-smoke','hello from win')",
+                    (socket.gethostname(),)
+                )
+                con.commit()
+        print("OK")
+        '@
+        $code | & $python -
+
+    5.Restart the Windows service once TCP works
+        # Make sure the service has the DB URL
+        nssm get SmartMonitor AppEnvironmentExtra
+
+        # Restart and tail logs
+        nssm restart SmartMonitor
+        Get-Content -Wait "C:\ProgramData\SmartMonitor\logs\smartmonitor.err.log"
+
+        Why this happened:
+            Windows had a host-only NIC (192.168.56.30), but the Linux VM did not. Without a matching host-only NIC/IP
+            on the VM, there’s no L2 connectivity on 192.168.56.0/24, so ARP fails and TCP never establishes,
+            regardless of routes/metrics. Once both VMs share the host-only network, the existing
+            Postgres + pg_hba config will work.
+
+        The only thing missing is: make sure web01 is attached to the same Host-Only network as Windows NIC.
+
+From screenshots:
+    Windows has several Host-Only networks. The one you want is “VirtualBox Host-Only Ethernet Adapter #4” → 192.168.56.1/24 (DHCP off is fine).
+    Vagrantfile sets private_network ip: "192.168.56.11" but doesn’t pin which host-only network to use—VirtualBox can pick the wrong one.
+
+    Do this:
+        Pin the Host-Only adapter in Vagrant
+        Add the virtualbox__hostonly option so web01 uses Adapter #4:
+            config.vm.define "web01" do |web01|
+              web01.vm.box = "ubuntu/focal64"
+              web01.vm.hostname = "web01"
+
+              # Use the 192.168.56.0/24 host-only network explicitly
+              web01.vm.network "private_network",
+                               ip: "192.168.56.11",
+                               virtualbox__hostonly: "VirtualBox Host-Only Ethernet Adapter #4"
+
+              web01.vm.network "forwarded_port", guest: 5000, host: 5050, host_ip: "127.0.0.1"
+              web01.vm.provider "virtualbox" do |vb|
+                vb.memory = "4096"
+                vb.cpus = 2
+              end
+            end
+
+    Verify on the VMLinux:
+        ip -4 addr | grep 192.168.56
+        ip -4 route | grep 192.168.56.0
+        # Should show an interface (often enp0s8) with 192.168.56.11/24
+        ping -c 2 192.168.56.30
+    window:
+         ping -S 192.168.56.30 192.168.56.11
+         arp -a | findstr 192.168.56.11
+         Test-NetConnection 192.168.56.11 -Port 5432 -InformationLevel Detailed
+            Expect: TcpTestSucceeded : True and SourceAddress : 192.168.56.30
+         Set-NetIPInterface -InterfaceAlias "Ethernet 2" -InterfaceMetric 5
+         Set-NetIPInterface -InterfaceAlias "Ethernet"   -InterfaceMetric 50
+         Get-NetRoute -DestinationPrefix "192.168.56.0/24" | ft DestinationPrefix,NextHop,InterfaceAlias,RouteMetric
+
+AUth Issues:psycopg: FATAL:  password authentication failed for user "smart"
+Reset the password and ensure LOGIN on the VM
+    sudo -u postgres psql -d smartdb <<'SQL'
+    -- make sure the role exists and can log in
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'smart') THEN
+        CREATE ROLE smart LOGIN;
+      ELSE
+        ALTER ROLE smart LOGIN;
+      END IF;
+    END$$;
+
+    -- use SCRAM-compatible password (PG12 default)
+    ALTER ROLE smart WITH ENCRYPTED PASSWORD 'smartpass';
+    -- sanity check:
+    \du smart
+    SHOW password_encryption;
+    SQL
+
+        Test:
+            PGPASSWORD=smartpass psql -U smart -h 192.168.56.11 -d smartdb -c "select 1;"
+        Result:
+             ?column?
+            ----------
+                    1
+            If that works, the server + pg_hba.conf are good.
+
+Retry from Windows
+    $env:DATABASE_URL = "postgresql://smart:smartpass@192.168.56.11:5432/smartdb?connect_timeout=5"
+    $python = "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe"
+    $code = @'
+    import os, socket, psycopg
+    with psycopg.connect(os.environ["DATABASE_URL"]) as con:
+        with con.cursor() as cur:
+            cur.execute(
+                "INSERT INTO alerts(hostname,severity,source,message) VALUES (%s,'info','win-smoke','hello from win')",
+                (socket.gethostname(),)
+            )
+            con.commit()
+    print("OK")
+    '@
+    $code | & $python -
+
+    If it still fails
+        Double-check pg_hba.conf has a matching rule (order matters):
+
+        mismatch:  pg_hba.conf line for the Windows client says scram-sha-256,
+        but the cluster is currently set to generate MD5 hashes:
+
+    So the smart user’s password is stored as MD5, which cannot authenticate via a scram-sha-256 rule — hence the failure.
+
+Two clean fixes. Pick one:
+Option A (recommended): switch cluster to SCRAM and reset the password
+Set the cluster’s password algorithm to SCRAM and reload:
+    sudo -u postgres psql -d smartdb -c "ALTER SYSTEM SET password_encryption='scram-sha-256'; SELECT pg_reload_conf(); SHOW password_encryption;"
+
+     password_encryption
+    ---------------------
+     scram-sha-256
+
+ Re-set the smart password so it’s stored as SCRAM (important!):
+    sudo -u postgres psql -d smartdb -c "ALTER ROLE smart WITH PASSWORD 'smartpass';"
+
+(Optional sanity check — superuser only)
+    sudo -u postgres psql -d smartdb -c "SELECT rolname, left(rolpassword,14) FROM pg_authid WHERE rolname='smart';"
+    -- should start with 'SCRAM-SHA-256'
+
+Test locally from the VM over the host-only IP:
+    PGPASSWORD=smartpass psql -U smart -h 192.168.56.11 -d smartdb -c "select 1;"
+
+Test from Windows again (same quick script you used). Your pg_hba.conf line can remain:
+    host    all    smart    192.168.56.0/24    scram-sha-256
+
+Option B: keep MD5 and relax pg_hba to md5 prefer not to change cluster-wide settings:
+    Edit pg_hba to use md5 for that network/user:
+        host    all    smart    192.168.56.0/24    md5
+        sudo systemctl reload postgresql
+        sudo -u postgres psql -d smartdb -c "ALTER ROLE smart WITH ENCRYPTED PASSWORD 'smartpass';"
+
+
+
+How Postgres decides whether your password is accepted
+    Postgres auth is a two-step process:
+        Which pg_hba.conf rule matches?
+            The first matching line wins. That line decides whether to use md5, scram-sha-256, peer, reject, etc.
+        Is your stored password compatible with that method?
+            If the rule says md5, the user’s password must be stored in MD5 form (pg_authid.rolpassword starts with md5...).
+            If the rule says scram-sha-256, the user’s password must be stored as SCRAM (SCRAM-SHA-256:...).
+            If they don’t match, you get: FATAL: password authentication failed.
+
+    Quick reality check (server side):
+        -- Which file is the server reading?
+        SHOW hba_file;
+
+        -- See the interpreted rules & order:
+        SELECT * FROM pg_hba_file_rules;
+
+        -- How is the user's password stored?
+        SELECT rolname, left(rolpassword, 14) AS starts_with
+        FROM pg_authid
+        WHERE rolname = 'smart';
+        -- md5xxxxxxxxxxxx  => MD5 password
+        -- SCRAM-SHA-256:   => SCRAM password
+
+2.The three places auth can silently go wrong
+A.Wrong pg_hba rule matched (rule order!)
+    pg_hba is first match wins. A generic earlier rule can steal the match.
+        Example:
+            host all all 192.168.56.0/24 md5
+            host smartdb smart 192.168.56.0/24 scram-sha-256
+        The first line matches everything on that subnet—your second line is never used.
+
+            Fix
+                Put your most specific rule above more general rules.
+                After editing, reload (no restart needed):
+                sudo systemctl reload postgresql
+
+B.Password method mismatch (md5 vs scram)
+    Cluster’s password_encryption only affects new passwords you set.
+    If the role was created long ago with md5 and your pg_hba now says scram-sha-256, the login fails.
+
+        Fix one of the two:
+            Option 1 (what we used): stick with md5 in pg_hba and re-set the password:
+                ALTER ROLE smart WITH ENCRYPTED PASSWORD 'smartpass';
+                -- Confirm:
+                SELECT rolname, (rolpassword LIKE 'md5%') AS is_md5 FROM pg_authid WHERE rolname='smart';
+
+            Option 2 (more secure): move to SCRAM:
+                SET password_encryption = 'scram-sha-256';
+                ALTER ROLE smart WITH ENCRYPTED PASSWORD 'smartpass';
+                -- Confirm SCRAM:
+                SELECT rolname, (rolpassword LIKE 'SCRAM-SHA-256:%') AS is_scram
+                FROM pg_authid WHERE rolname='smart';
+                -- And ensure the matching pg_hba rule uses 'scram-sha-256'
+
+C.You’re not connecting from the subnet you think
+    Windows box had two NICs (NAT 10.0.2.x and Host-Only 192.168.56.x).
+    Without route/interface metric tuning, connections could leave via NAT. Then pg_hba with only 192.168.56.0/24 will reject or hit the wrong rule.
+
+        Fix
+            Prefer host-only NIC:
+                Set-NetIPInterface -InterfaceAlias "Ethernet 2" -InterfaceMetric 5
+                Set-NetIPInterface -InterfaceAlias "Ethernet"   -InterfaceMetric 50
+
+            Ensure there’s an on-link route for 192.168.56.0/24 on Ethernet 2:
+                $ifIndex = (Get-NetAdapter -Name "Ethernet 2").ifIndex
+                route add 192.168.56.0 mask 255.255.255.0 192.168.56.30 if $ifIndex -p
+
+            Verify the test actually uses the host-only NIC:
+                Test-NetConnection 192.168.56.11 -Port 5432 -InformationLevel Detailed
+                # Check "SourceAddress" is 192.168.56.30
+
+
+Timeout Connection VM WIndows:
+VM Postgres timeout. Run these in order and you’ll know exactly where it’s failing:
+1) Raw TCP reachability (no DB involved)
+    PowerShell (as admin):
+        # Quick TCP test
+        Test-NetConnection 192.168.56.11 -Port 5432
+            TcpTestSucceeded : True → the socket opens; skip to step 3.
+            False → path/firewall/routing issue; do step 2.
+
+2) If TCP fails: confirm Windows is using the host-only NIC
+    # See the host-only NIC and its IP (e.g., 192.168.56.30)
+    Get-NetIPAddress -InterfaceAlias "Ethernet 2" -AddressFamily IPv4
+
+    # Prefer host-only over NAT
+    Set-NetIPInterface -InterfaceAlias "Ethernet 2" -InterfaceMetric 5
+    Set-NetIPInterface -InterfaceAlias "Ethernet"   -InterfaceMetric 50
+
+    # Make sure a route to 192.168.56.0/24 exists on Ethernet 2
+    Get-NetRoute -DestinationPrefix "192.168.56.0/24" | ft DestinationPrefix,NextHop,InterfaceAlias,RouteMetric
+    # If it’s missing, add on-link route (gateway = your own host-only IP)
+    $my = (Get-NetIPAddress -InterfaceAlias "Ethernet 2" -AddressFamily IPv4).IPAddress
+    $if = (Get-NetAdapter -Name "Ethernet 2").ifIndex
+    route add 192.168.56.0 mask 255.255.255.0 $my if $if -p
+
+
+    On the Linux VM at the same time, watch for SYNs:
+        On the Linux VM at the same time, watch for SYNs:
+            If you see no packets: Windows isn’t sending via the host-only NIC → fix the route/metric.
+            If you see SYNs but no SYN-ACK: something is blocking on the VM path (rare if ss -lntp shows 0.0.0.0:5432).
+            If TCP now succeeds (step 1 shows True), proceed.
+
+3) Minimal DB connect (tiny timeout, clear error)
+    From Windows (uses your service’s Python):
+        $env:DATABASE_URL = "postgresql://smart:smartpass@192.168.56.11:5432/smartdb?connect_timeout=3&sslmode=disable"
+        $python = "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\python.exe"
+        $code = @'
+        import os, psycopg
+        try:
+            with psycopg.connect(os.environ["DATABASE_URL"]) as con:
+                with con.cursor() as cur:
+                    cur.execute("select 1")
+                    print("DB OK:", cur.fetchone())
+        except Exception as e:
+            print("DB ERR:", e)
+        '@
+        $code | & $python -
+
+        If you get DB OK: (1,) → connectivity and auth are good.
+        If you get FATAL: password authentication failed → credentials/pg_hba mismatch (go to step 4).
+        If you still get timeout here but step 1 succeeded: check Postgres logs & pg_hba rules (step 4).
+
+4) Server-side quick checks (on the VM)
+    # Listener is up on the host-only IP?
+    ss -lntp | grep 5432
+
+    # pg_hba rules that matter (you want md5 here for user "smart"):
+    sudo -u postgres psql -d smartdb -c "SELECT * FROM pg_hba_file_rules;"
+    # Expect a line like:
+    # host | {smartdb} | {smart} | 192.168.56.0 | 255.255.255.0 | md5
+
+    # Log tail while you attempt a Windows connect
+    sudo tail -f /var/log/postgresql/*main*.log
+
+        If you see FATAL: password authentication failed, re-set the password to match your clients:
+            sudo -u postgres psql -d smartdb -c "ALTER ROLE smart WITH ENCRYPTED PASSWORD 'smartpass';"
+            sudo systemctl reload postgresql
+
+5) One-liner TCP client (even faster than Test-NetConnection)
+if you just want a yes/no socket test from Windows:
+    $h="192.168.56.11"; $p=5432
+    try { $c=New-Object Net.Sockets.TcpClient; $c.Connect($h,$p); "TCP OK"; $c.Close() } catch { "TCP ERR: $($_.Exception.Message)" }
+
+
+What usually causes the timeout (in this setup)
+Windows is choosing the NAT NIC (10.0.2.15) to reach 192.168.56.11 (no route). Fix by:
+giving “Ethernet 2” (host-only) a lower InterfaceMetric,
+ensuring the on-link route 192.168.56.0/24 exists on “Ethernet 2”.
+Postgres listens but pg_hba blocks → you’d get FATAL quickly, not timeout.
+Firewall: ufw allow from 192.168.56.0/24 to any port 5432, so unlikely now.
+Run steps 1 → 3; if it still times out, watch tcpdump in step 2 to see whether packets even reach the VM.
+That will tell you instantly whether it’s routing (Windows side) or server side.
+
+
+No SYN-ACK back. That means the TCP handshake never completes. In other words, packets hit the VM,
+but the VM’s kernel isn’t sending a reply. That’s below Postgres/pg_hba (if pg_hba were the problem, TCP would
+still complete and you’d get a fast FATAL: auth error, not a timeout).
+
+Let’s zero in with a few fast checks.
+Quick fixes / checks (run on the VM)
+    Is Postgres actually listening on the host-only IP:
+        sudo ss -lntp | grep ':5432'
+        # should show 0.0.0.0:5432 or 192.168.56.11:5432 bound by postgres
+
+    If it’s only on 127.0.0.1:5432, set in postgresql.conf:
+        sudo grep -E '^[^#]*listen_addresses' /etc/postgresql/*/main/postgresql.conf
+        # if not *, do:
+        sudo sed -i "s/^#\?listen_addresses.*/listen_addresses = '*'/" /etc/postgresql/*/main/postgresql.conf
+        sudo systemctl reload postgresql
+
+    Local connect via host-only address (confirms binding & route):
+        PGPASSWORD=smartpass psql -U smart -h 192.168.56.11 -d smartdb -c "select 1;"
+
+    If this works, Postgres is listening correctly on the host-only IP.
+    Even if UFW is inactive, raw iptables rules can still block.
+
+    iptables (INPUT/OUTPUT) could be dropping replies:
+        sudo iptables -L -n -v
+        sudo iptables -S | egrep -i 'DROP|REJECT|5432|enp0s8' || true
+
+    Temporary allow 5432 both ways on enp0s8:
+        sudo iptables -I INPUT  -i enp0s8 -p tcp --dport 5432 -j ACCEPT
+        sudo iptables -I OUTPUT -o enp0s8 -p tcp --sport 5432 -j ACCEPT
+
+    Retry the Windows connection test immediately.
+    Reverse-path filter (rp_filter)
+    Shouldn’t bite on same /24, but let’s confirm:
+        sysctl net.ipv4.conf.enp0s8.rp_filter
+        # If it's 1 or 2 and you still have issues, try:
+        sudo sysctl -w net.ipv4.conf.enp0s8.rp_filter=0
+
+    See both directions on the wire
+    In a second shell, run while you test from Windows:
+        # ARP + TCP lets us see ARP resolution and whether a SYN-ACK ever goes out
+        sudo tcpdump -ni enp0s8 '(arp or tcp port 5432)' -vv
+            If you only see SYNs and no SYN-ACK, it’s firewall/rules on the VM.
+            If you do see SYN-ACKs leaving but Windows still times out, it’s a return path problem (unlikely on host-only).
+
+Why the source is 192.168.56.1
+That’s the VirtualBox Host-Only Adapter on the Windows host (not the Windows guest IP you added).
+That’s fine — your VM at 192.168.56.11 should happily talk to 192.168.56.1 on the same /24. The fact that SYNs
+arrive proves Windows → VM routing is OK. The missing SYN-ACK means the VM isn’t replying (most often: iptables or
+Postgres isn’t actually listening on that interface).
+
+        Most likely fixes (based on your capture)
+            Postgres is listening (you showed earlier), so the top suspect is iptables dropping replies on enp0s8.
+            Insert those two ACCEPT rules and re-test.
+            If you changed listen_addresses, reload Postgres and re-test.
+            Keep pg_hba.conf with your md5 lines for 192.168.56.0/24 — but remember: pg_hba affects after TCP; it won’t cause timeouts.
+
+                Ping me with the outputs of:
+                    ss -lntp | grep 5432
+                    iptables -L -n -v (just the INPUT/OUTPUT chain headers + any DROP/REJECT lines)
+                    A short snippet from tcpdump after you try again (do you see SYN-ACK now?)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
