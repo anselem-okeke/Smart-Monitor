@@ -2,7 +2,6 @@ import json
 import os
 
 service_config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../config/approved_services.json"))
-print(service_config_path)
 def load_approved_services(config_path=service_config_path):
     try:
         with open(config_path, "r") as f:

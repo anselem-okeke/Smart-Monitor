@@ -1,0 +1,44 @@
+name: Build Windows Orchestrator Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'platform_infra/docker/orchestrator.Dockerfile'
+      - 'platform_infra/docker/entrypoint.ps1'
+      - 'platform_infra/docker/healthcheck.py'
+      - 'scripts/**'
+      - 'config/**'
+      - 'db/**'
+      - 'utils/**'
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    env:
+      IMAGE_NAME: smartmon-orchestrator
+      VERSION: 1.0.0-win
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Docker Hub login
+      - name: Log in to Docker Hub
+        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # GitHub Container Registry (GHCR) login
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # Build and push
+      - name: Build and push Windows orchestrator
+        run: |
+          docker build -f platform_infra/docker/orchestrator.Dockerfile `
+            --target windows `
+            -t anselemo/${{ env.IMAGE_NAME }}:${{ env.VERSION }} `
+            -t ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} `
+            --push .

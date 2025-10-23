@@ -1,0 +1,570 @@
+METHOD 1. (Recommended): Private overlay/VPN (WireGuard or Tailscale)
+setup for an agent that lives outside LAN using a private overlay:
+    WireGuard (DIY VPN, fast + simple)
+    Tailscale (managed WireGuard, even simpler)
+    Both end agent talking to Postgres over a private VPN IP, port 5432 never exposed to the internet.
+
+
+0) Quick topology & prerequisites
+    DB VM (Postgres server) will act as the VPN “hub”.
+    Outside agent (Linux) will be the VPN “client”.
+    DB VM to be reachable on UDP 51820 from the agent:
+        If the VM is on a bridged adapter and router can port-forward → forward UDP 51820 to the VM.
+
+        If the VM can’t receive inbound traffic (e.g., NAT only):
+            Host WireGuard on any reachable machine (cloud VM, your router) and still point the agent to Postgres over the tunnel, or
+            Use Tailscale (no ports to forward).
+
+    Assume DB VM can receive UDP 51820. If not, jump to Tailscale.
+        WG subnet: 10.66.0.0/24
+        DB VM WG IP: 10.66.0.1
+        Agent WG IP: 10.66.0.2
+        Postgres DB/name/user/pass: smartdb / smart / smartpass
+        Postgres runs on the DB VM (same box as WG server)
+
+        Replace IPs/values if you prefer.
+
+1) WireGuard — DB VM (Ubuntu/Debian)
+    1.1 Install & keys
+        sudo apt-get update && sudo apt-get install -y wireguard
+        umask 077
+        wg genkey | tee /etc/wireguard/server.key | wg pubkey > /etc/wireguard/server.pub
+
+    1.2 Server config: /etc/wireguard/wg0.conf
+        [Interface]
+        Address = 10.66.0.1/24
+        ListenPort = 51820
+        PrivateKey = <paste contents of /etc/wireguard/server.key>
+
+        # Optional if you use ufw and need routing rules:
+        # PostUp   = ufw allow 51820/udp
+        # PostDown = ufw delete allow 51820/udp
+
+            Open the port (if you use ufw):
+                sudo ufw allow 51820/udp
+            Start + enable:
+                sudo systemctl enable --now wg-quick@wg0
+            Check:
+                sudo wg show
+                ip addr show wg0
+
+        If your DB VM is behind a router, add a port-forward on the router:
+        UDP 51820 → DB VM’s LAN IP (or public IP if bridged).
+
+2) WireGuard — Outside agent (Linux)
+    2.1 Install & keys
+        sudo apt-get update && sudo apt-get install -y wireguard
+        umask 077
+        wg genkey | tee ~/agent.key | wg pubkey > ~/agent.pub
+
+    2.2 Agent config: /etc/wireguard/wg0.conf
+    Replace <DB_PUBLIC_IP_OR_DDNS> with the public/forwarded IP or name that reaches your DB VM.
+
+        [Interface]
+        Address = 10.66.0.2/24
+        PrivateKey = <paste contents of ~/agent.key>
+
+        [Peer]
+        PublicKey = <paste server.pub from DB VM>
+        Endpoint = <DB_PUBLIC_IP_OR_DDNS>:51820
+        AllowedIPs = 10.66.0.0/24
+        PersistentKeepalive = 25
+
+    2.3 Add agent as a peer on the DB VM
+    Append to /etc/wireguard/wg0.conf on the DB VM:
+
+        [Peer]
+        PublicKey = <paste ~/agent.pub from agent>
+        AllowedIPs = 10.66.0.2/32
+
+        Then:
+            sudo systemctl restart wg-quick@wg0
+
+2.4 Bring up the agent tunnel
+    sudo systemctl enable --now wg-quick@wg0
+    sudo wg show
+Test ping:
+    ping -c2 10.66.0.1
+
+3) Postgres settings (DB VM)
+    3.1 Listen on the WireGuard interface
+        In postgresql.conf:
+
+            listen_addresses = '*'
+
+    3.2 Allow the WG subnet in pg_hba.conf
+        Choose your auth method (md5 or scram-sha-256, depending on how you created the password):
+            host    smartdb   smart    10.66.0.0/24    md5
+
+        Reload:
+            sudo systemctl reload postgresql
+
+        Verify Postgres is listening:
+            ss -lntp | grep 5432
+
+4) Point the agent at Postgres (private VPN IP)
+    On the agent:
+        export DATABASE_URL='postgresql://smart:smartpass@10.66.0.1:5432/smartdb?connect_timeout=5&keepalives=1&keepalives_idle=60&keepalives_interval=30&keepalives_count=5'
+
+    Smoke test:
+        sudo apt-get install -y postgresql-client >/dev/null 2>&1 || true
+        PGPASSWORD=smartpass psql -U smart -h 10.66.0.1 -d smartdb -c 'select 1;'
+
+    If you use a systemd service for the agent, put DATABASE_URL=... into /etc/smart-monitor/env
+    (or your service’s EnvironmentFile), then:
+        sudo systemctl daemon-reload
+        sudo systemctl restart smart-monitor-agent
+        journalctl -u smart-monitor-agent -f
+
+5) Troubleshooting checklist (WireGuard)
+    No handshake (sudo wg show):
+        Router/Firewall: ensure UDP 51820 reaches the DB VM.
+        Endpoint on agent must be the public/forwarded address.
+        Keys & PublicKey placements correct (server has agent pub, agent has server pub).
+        Try reducing MTU if weird stalls: add MTU = 1280 under each [Interface].
+
+    Handshake OK but DB connect fails:
+        pg_hba.conf must include the WG subnet (10.66.0.0/24).
+        Postgres must listen on * and be up: ss -lntp | grep 5432.
+        From agent: PGPASSWORD=smartpass psql -U smart -h 10.66.0.1 -d smartdb -c 'select now();'.
+        On DB VM: sudo tcpdump -ni wg0 port 5432 to see traffic hitting Postgres.
+
+    Intermittent timeouts over long-haul:
+        Keepalives in DATABASE_URL (already included above).
+        DB: set tcp_keepalives_idle=60, tcp_keepalives_interval=30, tcp_keepalives_count=5 in postgresql.conf.
+
+6) Tailscale (even simpler, no port forwards)
+If you can install Tailscale on both machines, this is typically easiest.
+    6.1 Install
+    DB VM:
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --ssh
+
+    Agent (Linux):
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up
+
+    Both devices will get 100.x Tailscale IPs and appear in the same tailnet.
+
+    6.2 Postgres access for the Tailscale IP
+    On the DB VM, find its Tailscale IP:
+        tailscale ip -4
+        # e.g., 100.95.12.34
+
+    pg_hba.conf:
+        host    smartdb   smart    100.64.0.0/10    md5
+
+    (Or restrict to the agent’s single 100.x address if you want to be precise.)
+
+    postgresql.conf:
+        listen_addresses = '*'
+
+    Reload:
+        sudo systemctl reload postgresql
+
+6.3 Connect from agent via Tailscale IP
+    export DATABASE_URL='postgresql://smart:smartpass@100.xx.yy.zz:5432/smartdb?connect_timeout=5'
+    PGPASSWORD=smartpass psql -U smart -h 100.xx.yy.zz -d smartdb -c 'select 1;'
+
+        With Tailscale, ACLs in the admin console can restrict which nodes can reach Postgres. You can also use
+        Tailscale DNS and MagicDNS to connect by hostname instead of IP.
+
+7) Notes you’ll thank yourself for later
+    Don’t ingest strings into numeric columns. Normalize unknowns to NULL so your classifiers don’t blow up
+    (we already patched Windows metrics to coerce “Not Available” → None).
+    Lock credentials: stick with smart/smartpass only in dev. For staging/prod, use a stronger password or SCRAM
+    and restrict pg_hba to exact VPN IPs.
+        Backups: after your DB is clean, consider a nightly dump:
+            sudo -u postgres pg_dump -Fc smartdb > /var/backups/smartdb_$(date +%F).dump
+
+
+
+
+
+METHOD 2. Use SSH tunneling
+    1) prerequisites
+        You can SSH from the agent into the DB VM (password or, better, key-based auth).
+        On the DB VM, Postgres is reachable at 127.0.0.1:5432 (default).
+            This is ideal: you do not need to bind Postgres to the network.
+        A Postgres user/db exist (e.g., smart:smartpass@smartdb).
+            If Postgres is bound to a non-loopback address only, ensure it at least listens on 127.0.0.1 too:
+                in postgresql.conf:
+                    listen_addresses = 'localhost' (or '*') and reload.
+
+2) one-off tunnel (manual)
+    On the agent (Linux):
+        # choose a free local port on the agent (5433 used here)
+        ssh -N -L 5433:127.0.0.1:5432 user@<db_vm_ssh_ip_or_dns>
+
+        -L 5433:127.0.0.1:5432 → forward agent’s localhost:5433 to DB VM’s 127.0.0.1:5432.
+        -N → no remote command (just the tunnel).
+
+    Test from the agent:
+        PGPASSWORD=smartpass psql -U smart -h 127.0.0.1 -p 5433 -d smartdb -c 'select 1;'
+
+    Point your agent app to:
+        DATABASE_URL=postgresql://smart:smartpass@127.0.0.1:5433/smartdb?connect_timeout=5
+
+3) harden + make it robust
+    3.1 key-based auth (recommended)
+    On the agent:
+        ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ''
+        ssh-copy-id -i ~/.ssh/id_ed25519.pub user@<db_vm_ssh_ip_or_dns>
+
+    3.2 SSH client config (~/.ssh/config on agent)
+        Host smartdb
+            HostName <db_vm_ssh_ip_or_dns>
+            User user
+            IdentityFile ~/.ssh/id_ed25519
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+            Compression yes
+            TCPKeepAlive yes
+
+        Now you can tunnel with:
+            ssh -N -L 5433:127.0.0.1:5432 smartdb
+
+    3.3 fail fast on bad forwards
+        Add -o ExitOnForwardFailure=yes so the command fails if the port forward can’t be established:
+            ssh -N -L 5433:127.0.0.1:5432 -o ExitOnForwardFailure=yes smartdb
+
+4) keep it running: autossh (recommended) or systemd
+    option A: autossh (simplest)
+        Install autossh on the agent:
+            sudo apt-get update && sudo apt-get install -y autossh
+
+        Run (foreground test):
+            AUTOSSH_GATETIME=0 autossh -M 0 -N \
+              -L 5433:127.0.0.1:5432 \
+              -o ExitOnForwardFailure=yes \
+              smartdb
+
+        Make a systemd service on the agent: /etc/systemd/system/smartdb-tunnel.service
+            [Unit]
+            Description=SmartDB SSH Tunnel (local 5433 -> DB VM 127.0.0.1:5432)
+            After=network-online.target
+            Wants=network-online.target
+
+            [Service]
+            Environment=AUTOSSH_GATETIME=0
+            ExecStart=/usr/bin/autossh -M 0 -N \
+              -o ExitOnForwardFailure=yes \
+              -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+              -L 5433:127.0.0.1:5432 smartdb
+            Restart=always
+            RestartSec=5
+            User=<agent_user>
+            WorkingDirectory=/home/<agent_user>
+
+            [Install]
+            WantedBy=multi-user.target
+
+
+        Enable + start:
+            sudo systemctl daemon-reload
+            sudo systemctl enable --now smartdb-tunnel
+            systemctl status smartdb-tunnel
+
+    option B: pure ssh under systemd
+        If you don’t want autossh:
+            /etc/systemd/system/smartdb-tunnel.service:
+
+                [Unit]
+                Description=SmartDB SSH Tunnel (local 5433 -> DB VM 127.0.0.1:5432)
+                After=network-online.target
+                Wants=network-online.target
+
+                [Service]
+                ExecStart=/usr/bin/ssh -N \
+                  -o ExitOnForwardFailure=yes \
+                  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+                  -L 5433:127.0.0.1:5432 smartdb
+                Restart=always
+                RestartSec=5
+                User=<agent_user>
+                WorkingDirectory=/home/<agent_user>
+
+                [Install]
+                WantedBy=multi-user.target
+
+            Reload/enable/start as above.
+
+5) securing Postgres (pg_hba.conf)
+    Because the tunnel lands on 127.0.0.1 on the DB VM side, you can keep Postgres local-only.
+    Ensure pg_hba.conf has a localhost rule:
+        # allow local TCP connections
+        host    smartdb   smart   127.0.0.1/32    md5
+
+    Reload:
+        sudo systemctl reload postgresql
+            This way, Postgres is never exposed to the network—only SSH users on the DB VM can reach it.
+
+6) variants you might need
+    6.1 DB VM only has outbound access (no inbound SSH from agent)
+        Use a reverse tunnel (run on the DB VM, dialing back to the agent):
+            # On DB VM (connects to agent’s SSH)
+            ssh -N -R 5433:127.0.0.1:5432 agentuser@<agent_public_ip_or_dns>
+
+
+        Now, on the agent, Postgres is available at localhost:5433 (the remote-forwarded port).
+        You may need GatewayPorts clientspecified on the agent’s SSHD if you want non-local binds.
+
+6.2 Bastion/jump host
+    If you must hop through a bastion:
+        ~/.ssh/config on agent:
+
+            Host bastion
+                HostName <bastion_public_ip>
+                User <bastion_user>
+                IdentityFile ~/.ssh/id_ed25519
+
+            Host smartdb
+                HostName <db_vm_private_ip>
+                User <db_vm_user>
+                IdentityFile ~/.ssh/id_ed25519
+                ProxyJump bastion
+
+    Tunnel still the same:
+        ssh -N -L 5433:127.0.0.1:5432 -o ExitOnForwardFailure=yes smartdb
+
+7) testing & troubleshooting
+    Port in use on agent?
+        ss -lntp | grep 5433
+
+    Pick another local port if needed.
+    Tunnel established?
+        SSH will stay running in the foreground without errors (or systemctl status smartdb-tunnel shows active).
+    From agent:
+        PGPASSWORD=smartpass psql -U smart -h 127.0.0.1 -p 5433 -d smartdb -c 'select now();'
+    App can’t connect but psql can?
+        Confirm your app uses DATABASE_URL=...127.0.0.1:5433...
+        Check the service environment file and restart the app service.
+
+    Tunnel drops over time?
+        Ensure ServerAliveInterval/CountMax in SSH options, or use autossh.
+        Unstable networks: add -o TCPKeepAlive=yes.
+
+    Authentication errors (psql “password authentication failed”):
+    Confirm the DB creds by testing locally on the DB VM:
+        sudo -u postgres psql -d smartdb -c '\du smart'
+        PGPASSWORD=smartpass psql -U smart -h 127.0.0.1 -d smartdb -c 'select 1;'
+
+        Ensure pg_hba.conf has the host ... 127.0.0.1/32 ... md5 rule above any more restrictive lines.
+
+    Debug the wire:
+        On the agent: ssh -vvv -N -L 5433:127.0.0.1:5432 smartdb
+        On the DB VM: sudo tcpdump -ni lo port 5432 to see forwarded traffic hit Postgres.
+
+8) production tips
+    Create a dedicated UNIX user on the agent (e.g., smartmon) to run the tunnel + app.
+    Restrict SSH on the DB VM (no shell for the SSH user, ForceCommand to /bin/false, and PermitOpen
+    127.0.0.1:5432 in ~/.ssh/authorized_keys options for the tunnel key).
+
+        Example authorized_keys line on DB VM for the tunnel key:
+            command="/bin/false",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,permitopen="127.0.0.1:5432" ssh-ed25519 AAAA... agent@host
+
+        Monitor the tunnel service with systemd, add alerts if it restarts too often.
+
+
+
+
+METHOD 3. Public Postgres only if you must — and then with TLS, IP allowlists, and strict auth.
+
+0) What you’ll end up with
+    Postgres listening on a public IP
+    TLS on (server cert) — optionally mTLS (client certs)
+    IP allowlist in firewall + pg_hba.conf
+    SCRAM passwords (no MD5)
+    Minimal, auditable exposure
+
+1) Prep DNS and packages
+    (Recommended) Point a DNS name at the VM’s public IP, e.g. pg.example.com.
+    Ensure packages are current:
+        sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib
+
+2) Turn on TLS (server certificate)
+    Option A: Let’s Encrypt (best if you own a domain)
+        sudo apt-get install -y certbot
+        sudo certbot certonly --standalone -d pg.example.com
+        # certs now under /etc/letsencrypt/live/pg.example.com/{fullchain.pem,privkey.pem}
+
+        Make copies for Postgres, owned by postgres and 600 on the key:
+            sudo install -o postgres -g postgres -m 600 /etc/letsencrypt/live/pg.example.com/privkey.pem /var/lib/postgresql/server.key
+            sudo install -o postgres -g postgres -m 644 /etc/letsencrypt/live/pg.example.com/fullchain.pem /var/lib/postgresql/server.crt
+
+        Renewal hook (so Postgres picks up renewed certs):
+            printf '#!/bin/sh\nsystemctl reload postgresql\n' | sudo tee /etc/letsencrypt/renewal-hooks/deploy/postgres-reload.sh
+            sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/postgres-reload.sh
+
+    Option B: Self-signed (only for testing or with mTLS)
+        sudo -u postgres openssl req -new -x509 -days 365 \
+          -nodes -text -out /var/lib/postgresql/server.crt \
+          -keyout /var/lib/postgresql/server.key \
+          -subj "/CN=pg.example.com"
+        sudo chown postgres:postgres /var/lib/postgresql/server.crt /var/lib/postgresql/server.key
+        sudo chmod 600 /var/lib/postgresql/server.key
+        sudo chmod 644 /var/lib/postgresql/server.crt
+
+3) Postgres TLS + network bind
+    Edit postgresql.conf (path like /etc/postgresql/12/main/postgresql.conf):
+
+        # listen only on interfaces you need (public IP or 0.0.0.0 with firewall)
+        listen_addresses = '0.0.0.0'
+
+        # TLS
+        ssl = on
+        ssl_cert_file = '/var/lib/postgresql/server.crt'
+        ssl_key_file  = '/var/lib/postgresql/server.key'
+        # (optional, for mTLS)
+        # ssl_ca_file   = '/var/lib/postgresql/client_ca.crt'
+        # ssl_prefer_server_ciphers = on
+
+        # strong password hashing
+        password_encryption = 'scram-sha-256'
+
+        Reload later after HBA + firewall are set.
+
+4) IP allowlist in the firewall
+    Only allow the agent(s) you expect. Example: allow 203.0.113.25 and 198.51.100.40:
+
+        sudo ufw allow from 203.0.113.25 to any port 5432 proto tcp
+        sudo ufw allow from 198.51.100.40 to any port 5432 proto tcp
+        # deny everything else to 5432 implicitly
+        sudo ufw enable
+        sudo ufw status numbered
+
+        (If you already use another firewall, add equivalent allow rules and ensure 5432 is otherwise blocked.)
+
+5) Tighten pg_hba.conf (authZ + authN)
+    Open /etc/postgresql/12/main/pg_hba.conf and put specific rules first:
+
+        # Allow specific agent IPs only, via TLS + SCRAM
+        hostssl  smartdb   smart    203.0.113.25/32     scram-sha-256
+        hostssl  smartdb   smart    198.51.100.40/32    scram-sha-256
+
+        # (Optional) Require client certificate (mTLS) on those lines:
+        # hostssl smartdb   smart    203.0.113.25/32   scram-sha-256 clientcert=verify-full
+
+        # Optional localhost access for admin/maintenance:
+        host     all       all      127.0.0.1/32       scram-sha-256
+        host     all       all      ::1/128            scram-sha-256
+
+        # Keep these at the bottom or remove if not needed:
+        # local    all     postgres                      peer
+
+
+    Reload Postgres:
+        sudo systemctl reload postgresql
+
+
+6) Create/verify roles with SCRAM passwords
+    sudo -u postgres psql
+
+    Inside psql:
+
+        -- Create DB and role (if not present)
+        CREATE DATABASE smartdb;
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'smart') THEN
+            CREATE ROLE smart LOGIN;
+          END IF;
+        END$$;
+
+        -- Ensure SCRAM password (because password_encryption='scram-sha-256')
+        ALTER ROLE smart WITH ENCRYPTED PASSWORD 'smartpass';
+
+        -- Privileges
+        GRANT ALL PRIVILEGES ON DATABASE smartdb TO smart;
+        \c smartdb
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO smart;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO smart;
+
+
+        (Load your schema as you did before, if needed.)
+
+7) Client connection (safe defaults)
+
+    On the client/agent, force TLS and hostname validation:
+        If using a public CA (Let’s Encrypt):
+        sslmode=verify-full and host=pg.example.com (must match cert CN/SAN).
+        If using self-signed: give the client a CA file (or server cert) and set sslrootcert.
+
+    Examples
+    psql from agent:
+        PGPASSWORD=smartpass psql \
+          "host=pg.example.com port=5432 dbname=smartdb user=smart sslmode=verify-full"
+
+    Python (psycopg3):
+        import psycopg
+        conn = psycopg.connect(
+            "postgresql://smart:smartpass@pg.example.com:5432/smartdb"
+            "?sslmode=verify-full"
+        )
+
+    Self-signed variant (copy server CA/cert to the agent as ~/pg_ca.crt):
+        PGPASSWORD=smartpass psql \
+          "host=pg.example.com port=5432 dbname=smartdb user=smart sslmode=verify-full sslrootcert=$HOME/pg_ca.crt"
+
+
+8) (Optional but strong) mTLS — client certificates
+    8.1 Create a small client CA + certs
+    On the DB VM (or a secure box):
+
+        # client CA (kept private)
+        openssl genrsa -out client_ca.key 4096
+        openssl req -x509 -new -nodes -key client_ca.key -sha256 -days 3650 \
+          -out client_ca.crt -subj "/CN=pg-client-ca"
+
+        # client key + CSR
+        openssl genrsa -out client.key 4096
+        openssl req -new -key client.key -out client.csr -subj "/CN=smart@pg.example.com"
+
+        # sign client cert with our CA
+        openssl x509 -req -in client.csr -CA client_ca.crt -CAkey client_ca.key \
+          -CAcreateserial -out client.crt -days 825 -sha256
+
+    Put client_ca.crt on the DB VM and reference it in postgresql.conf:
+        ssl_ca_file = '/var/lib/postgresql/client_ca.crt'
+
+    Then in pg_hba.conf add clientcert=verify-full on the hostssl lines.
+
+    Client uses:
+        psql "host=pg.example.com port=5432 dbname=smartdb user=smart sslmode=verify-full \
+              sslcert=/path/client.crt sslkey=/path/client.key sslrootcert=/path/client_ca.crt"
+
+        Combine mTLS with SCRAM for defense in depth (you can keep scram-sha-256 in HBA; cert proves client
+        identity, SCRAM proves the DB role/password).
+
+9) Logging, monitoring, hygiene
+    In postgresql.conf:
+        log_connections = on
+        log_disconnections = on
+        log_line_prefix = '%m [%p] %u@%d %h '
+
+
+    Watch auth failures (/var/log/postgresql/postgresql-*.log).
+    Consider pgBouncer for connection pooling if many clients.
+    Regularly rotate certs (Let’s Encrypt renew hook already reloads).
+    Keep pg_hba.conf allowlists tight; prefer /32 host entries over large CIDRs.
+    Keep ufw allows in sync with pg_hba.conf.
+
+10) Quick verification checklist
+    ss -lntp | grep 5432 → Postgres listening (expect 0.0.0.0:5432 or your public IP).
+    sudo ufw status → only allowed IPs listed for 5432.
+    sudo -u postgres psql -c "SHOW ssl;" → on
+
+    From an allowed client:
+        psql ... sslmode=verify-full → works
+
+    From a non-allowed IP:
+        Connect should fail (firewall or HBA reject).
+
+    From the agent app:
+        Use DATABASE_URL=postgresql://smart:smartpass@pg.example.com:5432/smartdb?sslmode=verify-full
+
+When to stop and use a tunnel/VPN instead
+    If you can’t make tight IP allowlists (clients roam or sit behind CGNAT)
+    If you can’t manage certs safely
+    If you want zero port exposure
+    In those cases, prefer SSH tunnels or WireGuard/Tailscale.

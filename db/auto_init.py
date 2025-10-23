@@ -70,8 +70,6 @@
 #         con.close()
 
 
-
-
 import os, getpass, sqlite3, logging
 from pathlib import Path
 
@@ -215,3 +213,5 @@ def ensure_db_initialized():
         return ensure_postgres_ready()
     else:
         return ensure_sqlite_initialized()
+
+
