@@ -15,12 +15,15 @@ RUN Write-Host '[BUILD] Windows Orchestrator' ; \
     [Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\Python311;C:\Program Files\Python311\Scripts;' + [Environment]::GetEnvironmentVariable('Path','Process'), 'Process') ; \
     & 'C:\Program Files\Python311\python.exe' --version
 
-# --- 2) Tools via choco (optional) ---
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; \
-    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; \
-    choco install -y smartmontools ; \
-    & `"C:\Program Files\smartmontools\bin\smartctl.exe`" --version
+
+# --- 2) Install Chocolatey + smartmontools (one-time safe block) ---
+RUN powershell -NoProfile -ExecutionPolicy Bypass -Command `
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; `
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; `
+    choco install -y smartmontools ; `
+    $exe = Join-Path $Env:ProgramFiles 'smartmontools\bin\smartctl.exe' ; `
+    Start-Process -FilePath $exe -ArgumentList '--version' -NoNewWindow -Wait
+
 
 # --- 3) Persist PATH for subsequent layers & runtime ---
 ENV PATH="C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;C:\\ProgramData\\chocolatey\\bin;%PATH%"
