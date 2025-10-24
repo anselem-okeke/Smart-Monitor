@@ -68,9 +68,11 @@
 #           docker push "$IMAGE_GH"
 
 
-# .github/workflows/build-windows.yml
 name: Build Windows Orchestrator Image
-permissions: { contents: read, packages: write }
+
+permissions:
+  contents: read
+  packages: write
 
 on:
   workflow_dispatch:
@@ -88,27 +90,48 @@ on:
 jobs:
   build-windows:
     runs-on: windows-2022
-    env: { IMAGE_NAME: smartmon-orchestrator, VERSION: 1.0.0-win }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with: { username: ${{ secrets.DOCKERHUB_USERNAME }}, password: ${{ secrets.DOCKERHUB_TOKEN }} }
-      - uses: docker/login-action@v3
-        with: { registry: ghcr.io, username: ${{ github.actor }}, password: ${{ secrets.GITHUB_TOKEN }} }
+    timeout-minutes: 60
+    env:
+      IMAGE_NAME: smartmon-orchestrator
+      VERSION: 1.0.0-win
 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Docker Hub login
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # GHCR login (personal repo → GITHUB_TOKEN is fine)
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build with legacy builder on Windows (BuildKit is not supported reliably)
       - name: Build and push (legacy builder)
         shell: bash
-        env: { DOCKER_BUILDKIT: "0" }
+        env:
+          DOCKER_BUILDKIT: "0"
         run: |
           IMAGE_DH=anselemo/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
           IMAGE_GH=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
 
           docker build \
             -f platform_infra/docker/orchestrator.windows.Dockerfile \
-            -t "$IMAGE_DH" -t "$IMAGE_GH" .
+            -t "$IMAGE_DH" \
+            -t "$IMAGE_GH" \
+            .
 
           docker push "$IMAGE_DH"
           docker push "$IMAGE_GH"
+
 
 
 
