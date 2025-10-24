@@ -1,27 +1,23 @@
-# Windows Server 2022 base
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 SHELL ["powershell","-Command"]
 
-# 1) Install Chocolatey and ensure default source is configured
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; \
-    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; \
-    choco feature enable -n=usePackageRepositoryOptimizations ; \
+# Install Chocolatey and ensure source exists
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; `
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; `
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; `
+    choco feature enable -n=usePackageRepositoryOptimizations ; `
     choco source add -n=chocolatey -s 'https://community.chocolatey.org/api/v2/' -y --priority=1
 
-# 2) Install Python (latest stable) + smartmontools (with portable fallback), refresh PATH for THIS layer, verify
-RUN $ErrorActionPreference='Stop' ; \
-    choco install -y python --no-progress ; \
-    try { choco install -y smartmontools --no-progress } catch { choco install -y smartmontools.portable --no-progress } ; \
-    # Refresh PATH for the current process so commands work immediately
-    $py='C:\Program Files\Python311' ; \
-    $sm='C:\Program Files\smartmontools\bin' ; \
-    if (Test-Path $sm) { $smUse=$sm } else { $smUse='C:\tools\smartmontools\bin' } ; \
-    [Environment]::SetEnvironmentVariable('Path', "$py;$py\Scripts;$smUse;C:\ProgramData\chocolatey\bin;" + [Environment]::GetEnvironmentVariable('Path','Process'), 'Process') ; \
-    python --version ; \
+# Install Python + smartmontools (portable fallback), refresh PATH for THIS layer, verify
+RUN choco install -y python --no-progress ; `
+    try { choco install -y smartmontools --no-progress } catch { choco install -y smartmontools.portable --no-progress } ; `
+    [Environment]::SetEnvironmentVariable('Path', `
+      'C:\Program Files\Python311;C:\Program Files\Python311\Scripts;C:\Program Files\smartmontools\bin;C:\tools\smartmontools\bin;C:\ProgramData\chocolatey\bin;' + `
+      [Environment]::GetEnvironmentVariable('Path','Process'), 'Process') ; `
+    python --version ; `
     smartctl --version
 
-# 3) Persist PATH for subsequent layers & runtime
+# Persist PATH for subsequent layers & runtime (Windows uses %PATH%)
 ENV PATH="C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\tools\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
 
 WORKDIR /app
