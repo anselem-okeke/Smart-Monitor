@@ -155,9 +155,9 @@ COPY platform_infra/docker/entrypoint.ps1      C:/app/entrypoint.ps1
 #RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","'C:\\Python311\\python.exe' -m pip install --upgrade pip wheel setuptools"]
 #RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","'C:\\Python311\\python.exe' -m pip install -r C:\\app\\requirements.txt"]
 #RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","'C:\\Python311\\python.exe' -m pip install psutil"]
-RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","& 'C:\\Python311\\python.exe' -m pip install --upgrade pip wheel setuptools"]
-RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","& 'C:\\Python311\\python.exe' -m pip install -r C:\\app\\requirements.txt"]
-RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","& 'C:\\Python311\\python.exe' -m pip install psutil"]
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","C:\\Python311\\python.exe -m pip install --upgrade pip wheel setuptools"]
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","C:\\Python311\\python.exe -m pip install -r C:\\app\\requirements.txt"]
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","C:\\Python311\\python.exe -m pip install psutil"]
 
 
 # 8) Healthcheck + entrypoint
