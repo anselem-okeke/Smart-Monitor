@@ -155,11 +155,15 @@ COPY platform_infra/docker/entrypoint.ps1      C:/app/entrypoint.ps1
 #RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","'C:\\Python311\\python.exe' -m pip install --upgrade pip wheel setuptools"]
 #RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","'C:\\Python311\\python.exe' -m pip install -r C:\\app\\requirements.txt"]
 #RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","'C:\\Python311\\python.exe' -m pip install psutil"]
-RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","C:\\Python311\\python.exe -m pip install --upgrade pip wheel setuptools"]
-RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","C:\\Python311\\python.exe -m pip install -r C:\\app\\requirements.txt"]
-RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","C:\\Python311\\python.exe -m pip install psutil"]
+# Switch to cmd just for pip
+SHELL ["cmd","/S","/C"]
 
+RUN "C:\Python311\python.exe" -m pip install --upgrade pip wheel setuptools
+RUN "C:\Python311\python.exe" -m pip install -r C:\app\requirements.txt
+RUN "C:\Python311\python.exe" -m pip install psutil
 
+# Switch back to PowerShell for the rest
+SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 # 8) Healthcheck + entrypoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["powershell","-NoProfile","-Command","try { & 'C:\\Python311\\python.exe' 'C:\\app\\healthcheck.py' } catch { exit 1 }"]
 CMD ["powershell","-NoProfile","-File","C:\\app\\entrypoint.ps1"]
