@@ -21,6 +21,6 @@ try:
 except Exception as e:
     print(f"[ERROR] DB not reachable: {e}")
     sys.exit(1)
-#dd
+
 print("[OK] Orchestrator healthy")
 sys.exit(0)
