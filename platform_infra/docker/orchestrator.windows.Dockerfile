@@ -86,16 +86,9 @@ SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 # 1) Install Chocolatey and ensure source exists
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; choco feature enable -n=usePackageRepositoryOptimizations ; choco source add -n=chocolatey -s 'https://community.chocolatey.org/api/v2/' -y --priority=1
 
-# 2) Install Python + smartmontools (portable fallback). Refresh PATH for THIS layer and verify.
-RUN choco install -y python --no-progress ; `
-    try { choco install -y smartmontools --no-progress } catch { choco install -y smartmontools.portable --no-progress } ; `
-    # Refresh PATH for THIS layer (cover both possible Choco locations)
-    [Environment]::SetEnvironmentVariable('Path', `
-      'C:\Python314;C:\Python314\Scripts;C:\Python311;C:\Python311\Scripts;C:\Program Files\smartmontools\bin;C:\tools\smartmontools\bin;C:\ProgramData\chocolatey\bin;' + `
-      [Environment]::GetEnvironmentVariable('Path','Process'),'Process') ; `
-    # Call Python by absolute path so we don't rely on a shell refresh
-    if (Test-Path 'C:\Python314\python.exe') { & 'C:\Python314\python.exe' --version } else { & 'C:\Python311\python.exe' --version } ; `
-    smartctl --version
+# 2) Install Python + smartmontools and refresh PATH for THIS layer; verify
+RUN choco install -y python --no-progress ; choco install -y smartmontools --no-progress || choco install -y smartmontools.portable --no-progress ; [Environment]::SetEnvironmentVariable('Path','C:\Python314;C:\Python314\Scripts;C:\Python311;C:\Python311\Scripts;C:\Program Files\smartmontools\bin;C:\tools\smartmontools\bin;C:\ProgramData\chocolatey\bin;' + [Environment]::GetEnvironmentVariable('Path','Process'),'Process') ; if (Test-Path 'C:\Python314\python.exe') { & 'C:\Python314\python.exe' --version } else { & 'C:\Python311\python.exe' --version } ; if (Test-Path 'C:\Program Files\smartmontools\bin\smartctl.exe') { & 'C:\Program Files\smartmontools\bin\smartctl.exe' --version } else { & 'C:\tools\smartmontools\bin\smartctl.exe' --version }
+
 
 # 3) Persist PATH for later layers + runtime (Windows uses %PATH%)
 ENV PATH="C:\\Python314;C:\\Python314\\Scripts;C:\\Python311;C:\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\tools\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
