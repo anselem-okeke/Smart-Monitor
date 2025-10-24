@@ -83,19 +83,24 @@
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 
-# 1) Install Chocolatey and ensure source exists
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; choco feature enable -n=usePackageRepositoryOptimizations ; choco source add -n=chocolatey -s 'https://community.chocolatey.org/api/v2/' -y --priority=1
+# 1) Install Chocolatey (with default source)
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
-# 2) Install Python + smartmontools and refresh PATH for THIS layer; verify
-RUN choco install -y python --no-progress ; choco install -y smartmontools --no-progress || choco install -y smartmontools.portable --no-progress ; [Environment]::SetEnvironmentVariable('Path','C:\Python314;C:\Python314\Scripts;C:\Python311;C:\Python311\Scripts;C:\Program Files\smartmontools\bin;C:\tools\smartmontools\bin;C:\ProgramData\chocolatey\bin;' + [Environment]::GetEnvironmentVariable('Path','Process'),'Process') ; if (Test-Path 'C:\Python314\python.exe') { & 'C:\Python314\python.exe' --version } else { & 'C:\Python311\python.exe' --version } ; if (Test-Path 'C:\Program Files\smartmontools\bin\smartctl.exe') { & 'C:\Program Files\smartmontools\bin\smartctl.exe' --version } else { & 'C:\tools\smartmontools\bin\smartctl.exe' --version }
+# 2) Install Python + smartmontools; refresh PATH for THIS layer; verify
+#    (Chocolatey installs current Python to C:\Python314 today; older to C:\Python311)
+RUN choco install -y python --no-progress ; `
+    choco install -y smartmontools --no-progress ; `
+    if ($LASTEXITCODE -ne 0) { choco install -y smartmontools.portable --no-progress ; $sm='C:\tools\smartmontools\bin' } else { $sm='C:\Program Files\smartmontools\bin' } ; `
+    if (Test-Path 'C:\Python314\python.exe') { $py='C:\Python314' } elseif (Test-Path 'C:\Python311\python.exe') { $py='C:\Python311' } else { throw 'Python not found after install' } ; `
+    [Environment]::SetEnvironmentVariable('Path', "$py;$py\Scripts;$sm;C:\ProgramData\chocolatey\bin;" + [Environment]::GetEnvironmentVariable('Path','Process'),'Process') ; `
+    & "$py\python.exe" --version ; `
+    & "$sm\smartctl.exe" --version
 
-
-# 3) Persist PATH for later layers + runtime (Windows uses %PATH%)
+# 3) Persist PATH for later layers & runtime
 ENV PATH="C:\\Python314;C:\\Python314\\Scripts;C:\\Python311;C:\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\tools\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
 
-# 4) Your app (copy whatever you already had)
+# 4) App files (POSIX paths are fine on Windows Docker)
 WORKDIR /app
-
 COPY scripts /app/scripts
 COPY db /app/db
 COPY logs /app/logs
@@ -106,8 +111,12 @@ COPY main.py /app/main.py
 COPY platform_infra/docker/healthcheck.py /app/healthcheck.py
 COPY platform_infra/docker/entrypoint.ps1 /app/entrypoint.ps1
 
-RUN python -m pip install --upgrade pip wheel setuptools ; pip install -r C:\app\requirements.txt ; pip install psutil
+# 5) Python deps
+RUN python -m pip install --upgrade pip wheel setuptools ; `
+    pip install -r C:\app\requirements.txt ; `
+    pip install psutil
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["powershell","-Command","try { python C:\\app\\healthcheck.py } catch { exit 1 }"]
 CMD ["powershell","-File","C:\\app\\entrypoint.ps1"]
+
 
