@@ -67,10 +67,13 @@ RUN echo "[BUILD] Linux Orchestrator" && \
     apt-get update && apt-get install -y systemctl dbus util-linux smartmontools --no-install-recommends \
         ca-certificates curl tzdata procps && \
     rm -rf /var/lib/apt/lists/*
-# Non-root user
-RUN useradd -u 10001 -m -s /usr/sbin/nologin appuser
+
+# create user and add to disk group
+RUN useradd -u 10001 -m -s /usr/sbin/nologin appuser && \
+    usermod -aG disk appuser
+
+# Switch to non-root for runtime
 USER appuser
-RUN usermod -aG disk appuser
 
 # Healthcheck (invokes /app/orchestrator/healthcheck.py)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
