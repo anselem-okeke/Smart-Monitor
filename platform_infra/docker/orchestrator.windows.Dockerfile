@@ -82,13 +82,16 @@ SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 # 1) Install Chocolatey (single line; no continuations)
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); choco feature enable -n=usePackageRepositoryOptimizations
 
-# 2) Install Python + smartmontools and verify using absolute paths
-RUN choco install -y python --no-progress; try { choco install -y smartmontools --no-progress } catch { choco install -y smartmontools.portable --no-progress }; & 'C:\ProgramData\chocolatey\bin\python.exe' --version; & 'C:\Program Files\smartmontools\bin\smartctl.exe' --version
+# 2) Install Python (pinned) + smartmontools; verify absolute paths
+RUN choco install -y python --version=3.11.9 --no-progress; if (!(Test-Path 'C:\Python311\python.exe')) { throw 'Python 3.11 expected at C:\Python311\python.exe but not found' }; `
+    try { choco install -y smartmontools --no-progress } catch { choco install -y smartmontools.portable --no-progress }; `
+    & 'C:\Python311\python.exe' --version; `
+    & 'C:\Program Files\smartmontools\bin\smartctl.exe' --version
 
-# 3) Persist PATH for future layers
-ENV PATH="C:\\ProgramData\\chocolatey\\bin;C:\\Program Files\\smartmontools\\bin;C:\\tools\\smartmontools\\bin;%PATH%"
+# 3) Persist PATH (runtime + later layers)
+ENV PATH="C:\\Python311;C:\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\tools\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
 
-# 4) App
+# 4) App payload
 WORKDIR /app
 COPY scripts /app/scripts
 COPY db /app/db
@@ -100,10 +103,12 @@ COPY main.py /app/main.py
 COPY platform_infra/docker/healthcheck.py /app/healthcheck.py
 COPY platform_infra/docker/entrypoint.ps1 /app/entrypoint.ps1
 
-# 5) Install Python deps using the Chocolatey shim (stable regardless of actual install dir)
-RUN 'C:\ProgramData\chocolatey\bin\python.exe' -m pip install --upgrade pip wheel setuptools; 'C:\ProgramData\chocolatey\bin\python.exe' -m pip install -r C:\app\requirements.txt; 'C:\ProgramData\chocolatey\bin\python.exe' -m pip install psutil
+# 5) Install Python deps using absolute Python path (no PATH dependence)
+RUN 'C:\Python311\python.exe' -m pip install --upgrade pip wheel setuptools; `
+    'C:\Python311\python.exe' -m pip install -r C:\app\requirements.txt; `
+    'C:\Python311\python.exe' -m pip install psutil
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["powershell","-Command","try { & 'C:\\ProgramData\\chocolatey\\bin\\python.exe' 'C:\\app\\healthcheck.py' } catch { exit 1 }"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["powershell","-Command","try { & 'C:\\Python311\\python.exe' 'C:\\app\\healthcheck.py' } catch { exit 1 }"]
 CMD ["powershell","-File","C:\\app\\entrypoint.ps1"]
 
 
