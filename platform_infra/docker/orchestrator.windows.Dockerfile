@@ -1,32 +1,20 @@
-# Windows Server 2022 (matches GH windows-2022 runner)
+# Windows Server 2022 base
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
-
 SHELL ["powershell","-Command"]
 
-
-# --- 1) Install Python 3.11 and verify in THIS layer ---
-RUN Write-Host '[BUILD] Windows Orchestrator' ; \
-    Write-Host '[SETUP] Downloading Python 3.11 ...' ; \
+# 1) Install Chocolatey once
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; \
-    Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.8/python-3.11.8-amd64.exe' -OutFile 'C:\\python-installer.exe' ; \
-    Start-Process -FilePath 'C:\\python-installer.exe' -ArgumentList '/quiet InstallAllUsers=1 PrependPath=1 Include_test=0' -Wait ; \
-    Remove-Item 'C:\\python-installer.exe' -Force ; \
-    # Make python available to THIS layer's PowerShell session
-    [Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\Python311;C:\Program Files\Python311\Scripts;' + [Environment]::GetEnvironmentVariable('Path','Process'), 'Process') ; \
-    & 'C:\Program Files\Python311\python.exe' --version
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
+# 2) Install Python + smartmontools, refresh PATH for THIS layer, verify both
+RUN choco install -y python --version=3.11.9 smartmontools ; \
+    [Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\Python311;C:\Program Files\Python311\Scripts;C:\Program Files\smartmontools\bin;' + [Environment]::GetEnvironmentVariable('Path','Process'), 'Process') ; \
+    python --version ; \
+    smartctl --version
 
-# --- 2) Install Chocolatey + smartmontools (one-time safe block) ---
-RUN powershell -NoProfile -ExecutionPolicy Bypass -Command `
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; `
-    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; `
-    choco install -y smartmontools ; `
-    $exe = Join-Path $Env:ProgramFiles 'smartmontools\bin\smartctl.exe' ; `
-    Start-Process -FilePath $exe -ArgumentList '--version' -NoNewWindow -Wait
-
-
-# --- 3) Persist PATH for subsequent layers & runtime ---
-ENV PATH="C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;C:\\ProgramData\\chocolatey\\bin;%PATH%"
+# 3) Persist PATH for subsequent layers & runtime
+ENV PATH="C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
 
 WORKDIR /app
 
