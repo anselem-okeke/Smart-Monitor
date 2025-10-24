@@ -20,7 +20,7 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')) ; \
     choco install -y smartmontools ; \
-    smartctl --version
+     & "C:\Program Files\smartmontools\bin\smartctl.exe" --version
 
 # --- 3) Persist PATH for subsequent layers & runtime ---
 ENV PATH="C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;C:\\ProgramData\\chocolatey\\bin;%PATH%"
