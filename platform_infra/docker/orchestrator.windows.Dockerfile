@@ -77,39 +77,67 @@
 
 
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Run PowerShell for all subsequent RUN/CMD/ENTRYPOINT execs
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 
-# 1) Install Chocolatey (single line; no continuations)
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); choco feature enable -n=usePackageRepositoryOptimizations
+# 1) Install Chocolatey (exec-form RUN avoids Docker parser issues)
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"Set-ExecutionPolicy Bypass -Scope Process -Force; \
+ [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+ iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); \
+ choco feature enable -n=usePackageRepositoryOptimizations"
+]
 
-# 2) Install Python (pinned) + smartmontools; verify absolute paths
-RUN choco install -y python --version=3.11.9 --no-progress; if (!(Test-Path 'C:\Python311\python.exe')) { throw 'Python 3.11 expected at C:\Python311\python.exe but not found' }; `
-    try { choco install -y smartmontools --no-progress } catch { choco install -y smartmontools.portable --no-progress }; `
-    & 'C:\Python311\python.exe' --version; `
-    & 'C:\Program Files\smartmontools\bin\smartctl.exe' --version
+# 2) Install Python (PINNED to 3.11.x so path is stable) and verify
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"choco install -y python --version=3.11.9 --no-progress"
+]
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"if (!(Test-Path 'C:\\Python311\\python.exe')) { throw 'Python not found at C:\\Python311\\python.exe' } ; \
+ & 'C:\\Python311\\python.exe' --version"
+]
 
-# 3) Persist PATH (runtime + later layers)
-ENV PATH="C:\\Python311;C:\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\tools\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
+# 3) Install smartmontools (portable → fixed path C:\tools\smartmontools\bin) and verify
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"choco install -y smartmontools.portable --no-progress"
+]
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"& 'C:\\tools\\smartmontools\\bin\\smartctl.exe' --version"
+]
 
-# 4) App payload
-WORKDIR /app
-COPY scripts /app/scripts
-COPY db /app/db
-COPY logs /app/logs
-COPY utils /app/utils
-COPY config /app/config
-COPY requirements.txt /app/requirements.txt
-COPY main.py /app/main.py
-COPY platform_infra/docker/healthcheck.py /app/healthcheck.py
-COPY platform_infra/docker/entrypoint.ps1 /app/entrypoint.ps1
+# 4) Persist PATH for future layers + runtime
+ENV PATH="C:\\Python311;C:\\Python311\\Scripts;C:\\tools\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
 
-# 5) Install Python deps using absolute Python path (no PATH dependence)
-RUN 'C:\Python311\python.exe' -m pip install --upgrade pip wheel setuptools; `
-    'C:\Python311\python.exe' -m pip install -r C:\app\requirements.txt; `
-    'C:\Python311\python.exe' -m pip install psutil
+# 5) App payload
+WORKDIR C:/app
+COPY scripts C:/app/scripts
+COPY db      C:/app/db
+COPY logs    C:/app/logs
+COPY utils   C:/app/utils
+COPY config  C:/app/config
+COPY requirements.txt C:/app/requirements.txt
+COPY main.py C:/app/main.py
+COPY platform_infra/docker/healthcheck.py C:/app/healthcheck.py
+COPY platform_infra/docker/entrypoint.ps1 C:/app/entrypoint.ps1
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["powershell","-Command","try { & 'C:\\Python311\\python.exe' 'C:\\app\\healthcheck.py' } catch { exit 1 }"]
-CMD ["powershell","-File","C:\\app\\entrypoint.ps1"]
+# 6) Python deps (always use absolute python path → no PATH timing issues)
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"'C:\\Python311\\python.exe' -m pip install --upgrade pip wheel setuptools"
+]
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"'C:\\Python311\\python.exe' -m pip install -r C:\\app\\requirements.txt"
+]
+RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command",
+"'C:\\Python311\\python.exe' -m pip install psutil"
+]
+
+# 7) Health + entrypoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["powershell","-NoProfile","-Command","try { & 'C:\\Python311\\python.exe' 'C:\\app\\healthcheck.py' } catch { exit 1 }"]
+
+CMD ["powershell","-NoProfile","-File","C:\\app\\entrypoint.ps1"]
+
 
 
 
