@@ -1,5 +1,5 @@
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command"]
+SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 
 # Install Chocolatey and ensure source exists
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force ; `
@@ -17,7 +17,6 @@ RUN choco install -y python --no-progress ; `
     python --version ; `
     smartctl --version
 
-# Persist PATH for subsequent layers & runtime (Windows uses %PATH%)
 ENV PATH="C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\tools\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
 
 WORKDIR /app
