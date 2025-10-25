@@ -1,0 +1,138 @@
+# ─────────────────────────────────────────────────────────────
+# Smart-Monitor Orchestrator (Cross-Platform, Multi-Platform)
+#   • Linux   → python:3.11-slim-bookworm
+#   • Windows → mcr.microsoft.com/windows/servercore:ltsc2022
+#   • Built via: docker buildx build --platform ...
+# ─────────────────────────────────────────────────────────────
+
+
+name: publish-multi-platform
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]   # runs on v1.0.0, v1.0.1, etc.
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: smartmon-orchestrator
+  DOCKERHUB_REPO: anselemo/smartmon-orchestrator
+  GHCR_REPO: ghcr.io/anselem-okeke/smartmon-orchestrator
+
+jobs:
+  # Derive VERSION = strip leading 'v' from tag, expose as output
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: Derive version from tag
+        id: v
+        run: |
+          RAW="${GITHUB_REF_NAME}"          # e.g. v1.0.0
+          echo "version=${RAW#v}" >> $GITHUB_OUTPUT
+
+  build_windows:
+    runs-on: windows-2022
+    needs: meta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # Login to BOTH registries
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      # Build & push Windows image with two tags (DH + GHCR)
+      - name: Build & push Windows
+        id: win
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: platform_infra/docker/orchestrator.windows.Dockerfile
+          platforms: windows/amd64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:${{ needs.meta.outputs.version }}-win
+            ${{ env.GHCR_REPO }}:${{ needs.meta.outputs.version }}-win
+
+  build_linux:
+    runs-on: ubuntu-latest
+    needs: meta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # Login to BOTH registries
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      # Build & push Linux image with two tags (DH + GHCR)
+      - name: Build & push Linux
+        id: lin
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: platform_infra/docker/orchestrator.linux.Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:${{ needs.meta.outputs.version }}-linux
+            ${{ env.GHCR_REPO }}:${{ needs.meta.outputs.version }}-linux
+
+  make_manifests:
+    runs-on: ubuntu-latest
+    needs: [meta, build_windows, build_linux]
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      # ----- Docker Hub manifest -----
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create DH manifest (version + latest)
+        run: |
+          V="${{ needs.meta.outputs.version }}"
+          docker buildx imagetools create \
+            -t ${{ env.DOCKERHUB_REPO }}:${V} \
+            -t ${{ env.DOCKERHUB_REPO }}:latest \
+            ${{ env.DOCKERHUB_REPO }}:${V}-linux \
+            ${{ env.DOCKERHUB_REPO }}:${V}-win
+          docker buildx imagetools inspect ${{ env.DOCKERHUB_REPO }}:${V}
+
+      # ----- GHCR manifest -----
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Create GHCR manifest (version + latest)
+        run: |
+          V="${{ needs.meta.outputs.version }}"
+          docker buildx imagetools create \
+            -t ${{ env.GHCR_REPO }}:${V} \
+            -t ${{ env.GHCR_REPO }}:latest \
+            ${{ env.GHCR_REPO }}:${V}-linux \
+            ${{ env.GHCR_REPO }}:${V}-win
+          docker buildx imagetools inspect ${{ env.GHCR_REPO }}:${V}
