@@ -45,9 +45,8 @@ SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 # 8) Healthcheck + entrypoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["powershell","-NoProfile","-Command","try { & 'C:\\Python311\\python.exe' 'C:\\app\\healthcheck.py' } catch { exit 1 }"]
 #CMD ["powershell","-NoProfile","-File","C:\\app\\entrypoint.ps1"]
-ENTRYPOINT ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-            "-NoProfile","-ExecutionPolicy","Bypass",
-            "-File","C:\\app\\entrypoint.ps1"]
+ENTRYPOINT ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-File","C:\\app\\entrypoint.ps1"]
+
 
 
 
