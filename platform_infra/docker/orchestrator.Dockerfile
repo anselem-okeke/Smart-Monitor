@@ -80,6 +80,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD python3 /app/healthcheck.py || exit 1
 
 CMD ["bash", "/app/entrypoint.sh"]
+
+
+
 #
 ## ─────────────────────────────────────────────────────────────
 ## WINDOWS VARIANT
