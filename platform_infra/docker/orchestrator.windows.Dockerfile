@@ -38,7 +38,8 @@ RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","choco ins
 RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","& 'C:\\Program Files\\smartmontools\\bin\\smartctl.exe' --version"]
 
 # 5) Persist PATH
-ENV PATH="C:\\Python311;C:\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
+#ENV PATH="C:\\Python311;C:\\Python311\\Scripts;C:\\Program Files\\smartmontools\\bin;C:\\ProgramData\\chocolatey\\bin;%PATH%"
+ENV PATH="C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Python311;C:\Python311\Scripts;C:\Program Files\smartmontools\bin;C:\ProgramData\chocolatey\bin"
 
 # 6) App payload
 WORKDIR C:/app
