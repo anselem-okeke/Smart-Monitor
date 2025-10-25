@@ -9,7 +9,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'platform_infra/docker/orchestrator.Dockerfile'
+      - 'platform_infra/docker/orchestrator.linux.Dockerfile'
       - 'platform_infra/docker/entrypoint.sh'
       - 'platform_infra/docker/healthcheck.py'
       - 'scripts/**'
@@ -53,7 +53,7 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --target linux \
-            -f platform_infra/docker/orchestrator.Dockerfile \
+            -f platform_infra/docker/orchestrator.linux.Dockerfile \
             -t $IMAGE_DH \
             -t $IMAGE_GH \
             --push .

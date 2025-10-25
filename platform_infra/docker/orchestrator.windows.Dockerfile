@@ -1,7 +1,27 @@
+# ─────────────────────────────────────────────────────────────
+# Smart-Monitor Orchestrator (Cross-Platform)
+#   • Windows → mcr.microsoft.com/windows/servercore:ltsc2022
+#   • Built via: docker build --platform ...
+# ─────────────────────────────────────────────────────────────
+
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 
-ENV PYTHONUNBUFFERED=1
+# OCI Metadata Labels
+LABEL org.opencontainers.image.title="Smart Monitor Orchestrator" \
+      org.opencontainers.image.description="Self-healing observability platform for hybrid systems" \
+      org.opencontainers.image.source="https://github.com/anselem-okeke/Smart-Monitor" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Anselem Dev" \
+      org.opencontainers.image.authors="Anselem Okeke <anselem.okekee@gmail.com>" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.documentation="https://github.com/anselem-dev/smart-monitor/docs"
+
+# Common environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SMARTMON_ROLE=orchestrator
 
 # 1) Install Chocolatey
 RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","Set-ExecutionPolicy Bypass -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); choco feature enable -n=usePackageRepositoryOptimizations"]
