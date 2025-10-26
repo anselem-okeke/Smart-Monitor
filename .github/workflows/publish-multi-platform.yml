@@ -43,13 +43,13 @@ on:
       - 'utils/**'
 
 env:
-  TAG: "1.0.0"   # default when triggered by push (no inputs available)
+  TAG: "1.0.0"   # default tag when triggered by push
   IMAGE_NAME: smartmon-orchestrator
   DOCKERHUB_REPO: anselemo/smartmon-orchestrator
   GHCR_REPO: ghcr.io/${{ github.repository_owner }}/smartmon-orchestrator
 
 jobs:
-  # Decide effective tag and what to build
+  # Figure out what to build/publish
   meta:
     runs-on: ubuntu-latest
     outputs:
@@ -79,8 +79,7 @@ jobs:
 
           # Windows (LTSC2022)?
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            WV="${{ inputs.windows_variant }}"
-            [ "$WV" = "ltsc2022" ] && echo "build_win_ltsc2022=true" >> $GITHUB_OUTPUT || echo "build_win_ltsc2022=false" >> $GITHUB_OUTPUT
+            [ "${{ inputs.windows_variant }}" = "ltsc2022" ] && echo "build_win_ltsc2022=true" >> $GITHUB_OUTPUT || echo "build_win_ltsc2022=false" >> $GITHUB_OUTPUT
           else
             echo "build_win_ltsc2022=true" >> $GITHUB_OUTPUT
           fi
@@ -101,7 +100,7 @@ jobs:
           fi
           echo "make_manifest=$MM" >> $GITHUB_OUTPUT
 
-  # ---------- LINUX (optional) ----------
+  # ---------- LINUX ----------
   build_linux:
     if: ${{ needs.meta.outputs.build_linux == 'true' }}
     runs-on: ubuntu-latest
@@ -113,7 +112,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -126,19 +126,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push Linux
+      - name: Build & push Linux (separate -t flags)
         run: |
           TAG="${{ needs.meta.outputs.tag }}"
-          TAGS="${{ env.DOCKERHUB_REPO }}:${TAG}-linux"
+          DH="${{ env.DOCKERHUB_REPO }}:${TAG}-linux"
           if [ "${{ needs.meta.outputs.push_ghcr }}" = "true" ]; then
-            TAGS="$TAGS,${{ env.GHCR_REPO }}:${TAG}-linux"
+            GH="${{ env.GHCR_REPO }}:${TAG}-linux"
+            docker buildx build \
+              --platform linux/amd64 \
+              -f platform_infra/docker/orchestrator.linux.Dockerfile \
+              -t "$DH" \
+              -t "$GH" \
+              --push \
+              .
+          else
+            docker buildx build \
+              --platform linux/amd64 \
+              -f platform_infra/docker/orchestrator.linux.Dockerfile \
+              -t "$DH" \
+              --push \
+              .
           fi
-          docker buildx build \
-            --platform linux/amd64 \
-            -f platform_infra/docker/orchestrator.linux.Dockerfile \
-            -t "$TAGS" \
-            --push \
-            .
 
       - id: out
         run: |
@@ -148,7 +156,7 @@ jobs:
             echo "gh_tag=${{ env.GHCR_REPO }}:${TAG}-linux" >> $GITHUB_OUTPUT
           fi
 
-  # ---------- WINDOWS LTSC2022 (optional) ----------
+  # ---------- WINDOWS (LTSC2022) ----------
   build_win_ltsc2022:
     if: ${{ needs.meta.outputs.build_win_ltsc2022 == 'true' }}
     runs-on: windows-2022
@@ -158,7 +166,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/login-action@v3
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -171,10 +180,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Windows Dockerfile must have:
+      # Windows Dockerfile must begin with:
       #   ARG BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022
       #   FROM ${BASE_IMAGE} AS windows
-      - name: Build & push Windows (LTSC2022)
+      - name: Build & push Windows (LTSC2022) (separate -t flags)
         run: |
           $TAG = "${{ needs.meta.outputs.tag }}"
           $DH  = "${{ env.DOCKERHUB_REPO }}:$TAG-win-ltsc2022"
@@ -194,7 +203,7 @@ jobs:
           docker push $DH
           if ("${{ needs.meta.outputs.push_ghcr }}" -eq "true") { docker push $GH }
 
-  # ---------- MANIFEST MERGE (optional) ----------
+  # ---------- MANIFEST ----------
   make_manifests:
     if: ${{ needs.meta.outputs.make_manifest == 'true' }}
     runs-on: ubuntu-latest
@@ -202,7 +211,6 @@ jobs:
     steps:
       - uses: docker/setup-buildx-action@v3
 
-      # Assemble sources based on what we actually built
       - id: gather
         shell: bash
         run: |
@@ -224,8 +232,8 @@ jobs:
           echo "dh=$SRC_DH" >> $GITHUB_OUTPUT
           echo "gh=$SRC_GH" >> $GITHUB_OUTPUT
 
-      # Docker Hub manifest
-      - uses: docker/login-action@v3
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -240,9 +248,9 @@ jobs:
             ${{ steps.gather.outputs.dh }}
           docker buildx imagetools inspect ${{ env.DOCKERHUB_REPO }}:${TAG}
 
-      # GHCR manifest
-      - uses: docker/login-action@v3
+      - name: (Optional) Login GHCR
         if: ${{ needs.meta.outputs.push_ghcr == 'true' }}
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -257,6 +265,7 @@ jobs:
             -t ${{ env.GHCR_REPO }}:latest \
             ${{ steps.gather.outputs.gh }}
           docker buildx imagetools inspect ${{ env.GHCR_REPO }}:${TAG}
+
 
 
 
