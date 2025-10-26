@@ -59,8 +59,8 @@ jobs:
             -t "$IMAGE_GH" \
             .
 
-          docker push "$IMAGE_DH"
-          docker push "$IMAGE_GH"
+#           docker push "$IMAGE_DH"
+#           docker push "$IMAGE_GH"
 
 
 

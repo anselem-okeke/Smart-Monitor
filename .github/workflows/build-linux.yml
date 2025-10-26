@@ -56,13 +56,13 @@ jobs:
             -f platform_infra/docker/orchestrator.linux.Dockerfile \
             -t $IMAGE_DH \
             -t $IMAGE_GH \
-            --push .
+            .
 
-      # (Optional) Create :latest in GHCR AFTER the GHCR package exists
-      - name: Tag GHCR :latest from GHCR version (optional)
-        run: |
-          IMAGE_GH_VER=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
-          IMAGE_GH_LATEST=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
-          docker buildx imagetools create -t $IMAGE_GH_LATEST $IMAGE_GH_VER
+#       # (Optional) Create :latest in GHCR AFTER the GHCR package exists
+#       - name: Tag GHCR :latest from GHCR version (optional)
+#         run: |
+#           IMAGE_GH_VER=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+#           IMAGE_GH_LATEST=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+#           docker buildx imagetools create -t $IMAGE_GH_LATEST $IMAGE_GH_VER
 
 

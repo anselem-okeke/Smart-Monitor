@@ -4,7 +4,10 @@
 #   • Built via: docker build --platform ...
 # ─────────────────────────────────────────────────────────────
 
-FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+#FROM mcr.microsoft.com/windows/servercore:ltsc2022
+ARG BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022
+FROM ${BASE_IMAGE} AS windows
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 
 # OCI Metadata Labels
