@@ -1,4 +1,4 @@
-## Smart-Monitor  (In Development, will soon be live)
+## Smart-Monitor  (In Production - live)
 
 ### Motivation for Developing Smart-Monitor
 

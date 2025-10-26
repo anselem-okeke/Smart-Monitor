@@ -146,7 +146,7 @@ jobs:
   # ---------- WINDOWS LTSC2022 (optional) ----------
   build_win_ltsc2022:
     if: ${{ needs.meta.outputs.build_win_ltsc2022 == 'true' }}
-    runs-on: windows-2022
+    runs-on: windows-2019
     needs: meta
     env:
       DOCKER_BUILDKIT: 0
