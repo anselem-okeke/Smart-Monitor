@@ -18,7 +18,7 @@ on:
       windows_variant:
         description: "Windows base to build"
         type: choice
-        options: [none, ltsc2022, 23H2, both]
+        options: [none, ltsc2022, ltsc2019, both]
         default: both
       push_ghcr:
         description: "Also push to GHCR"
@@ -79,16 +79,16 @@ jobs:
           WV="${{ github.event_name == 'workflow_dispatch' && inputs.windows_variant || 'both' }}"
           if [ "$WV" = "both" ]; then
             echo "build_win_ltsc2022=true" >> $GITHUB_OUTPUT
-            echo "build_win_23H2=true" >> $GITHUB_OUTPUT
+            echo "build_win_ltsc2019=true" >> $GITHUB_OUTPUT
           elif [ "$WV" = "ltsc2022" ]; then
             echo "build_win_ltsc2022=true" >> $GITHUB_OUTPUT
-            echo "build_win_23H2=false" >> $GITHUB_OUTPUT
-          elif [ "$WV" = "23H2" ]; then
+            echo "build_win_ltsc2019=false" >> $GITHUB_OUTPUT
+          elif [ "$WV" = "ltsc2019" ]; then
             echo "build_win_ltsc2022=false" >> $GITHUB_OUTPUT
-            echo "build_win_23H2=true" >> $GITHUB_OUTPUT
+            echo "build_win_ltsc2019=true" >> $GITHUB_OUTPUT
           else
             echo "build_win_ltsc2022=false" >> $GITHUB_OUTPUT
-            echo "build_win_23H2=false" >> $GITHUB_OUTPUT
+            echo "build_win_ltsc2019=false" >> $GITHUB_OUTPUT
           fi
 
           # Push GHCR?
