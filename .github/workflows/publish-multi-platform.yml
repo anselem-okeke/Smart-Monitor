@@ -190,8 +190,8 @@ jobs:
           if ("${{ needs.meta.outputs.push_ghcr }}" -eq "true") { docker push $GH }
 
   # ---------- WINDOWS 23H2 (optional) ----------
-  build_win_23H2:
-    if: ${{ needs.meta.outputs.build_win_23H2 == 'true' }}
+  build_win_ltsc2019:
+    if: ${{ needs.meta.outputs.build_win_ltsc2019 == 'true' }}
     runs-on: windows-2022
     needs: meta
     env:
@@ -212,13 +212,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push Windows (23H2)
+      - name: Build & push Windows (LTSC2019)
         run: |
           $TAG = "${{ needs.meta.outputs.tag }}"
-          $DH = "${{ env.DOCKERHUB_REPO }}:$TAG-win-23H2"
+          $DH = "${{ env.DOCKERHUB_REPO }}:$TAG-win-ltsc2019"
           $cmd = @(
             "docker build",
-            "--build-arg BASE_IMAGE=mcr.microsoft.com/windows/servercore:23H2",
+            "--build-arg BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2019",
             "-f platform_infra/docker/orchestrator.windows.Dockerfile",
             "-t $DH",
             "."
@@ -236,7 +236,7 @@ jobs:
   make_manifests:
     if: ${{ needs.meta.outputs.make_manifest == 'true' }}
     runs-on: ubuntu-latest
-    needs: [meta, build_linux, build_win_ltsc2022, build_win_23H2]
+    needs: [meta, build_linux, build_win_ltsc2022, build_win_ltsc2019]
     steps:
       - uses: docker/setup-buildx-action@v3
 
