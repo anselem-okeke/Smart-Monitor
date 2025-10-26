@@ -57,7 +57,7 @@ jobs:
       tag: ${{ steps.out.outputs.tag }}
       build_linux: ${{ steps.out.outputs.build_linux }}
       build_win_ltsc2022: ${{ steps.out.outputs.build_win_ltsc2022 }}
-      build_win_23H2: ${{ steps.out.outputs.build_win_23H2 }}
+      build_win_ltsc2019: ${{ steps.out.outputs.build_win_ltsc2019 }}
       push_ghcr: ${{ steps.out.outputs.push_ghcr }}
       make_manifest: ${{ steps.out.outputs.make_manifest }}
     steps:
@@ -189,7 +189,7 @@ jobs:
           docker push $DH
           if ("${{ needs.meta.outputs.push_ghcr }}" -eq "true") { docker push $GH }
 
-  # ---------- WINDOWS 23H2 (optional) ----------
+  # ---------- WINDOWS ltsc2019 (optional) ----------
   build_win_ltsc2019:
     if: ${{ needs.meta.outputs.build_win_ltsc2019 == 'true' }}
     runs-on: windows-2022
@@ -224,7 +224,7 @@ jobs:
             "."
           ) -join " "
           if ("${{ needs.meta.outputs.push_ghcr }}" -eq "true") {
-            $GH = "${{ env.GHCR_REPO }}:$TAG-win-23H2"
+            $GH = "${{ env.GHCR_REPO }}:$TAG-win-ltsc2019"
             $cmd = "$cmd -t $GH"
           }
           echo $cmd
@@ -261,11 +261,11 @@ jobs:
               SRC_GH="$SRC_GH ${{ env.GHCR_REPO }}:${TAG}-win-ltsc2022"
             fi
           fi
-          # Windows 23H2
-          if [ "${{ needs.meta.outputs.build_win_23H2 }}" = "true" ]; then
-            SRC_DH="$SRC_DH ${{ env.DOCKERHUB_REPO }}:${TAG}-win-23H2"
+          # Windows ltsc2019
+          if [ "${{ needs.meta.outputs.build_win_ltsc2019 }}" = "true" ]; then
+            SRC_DH="$SRC_DH ${{ env.DOCKERHUB_REPO }}:${TAG}-win-ltsc2019"
             if [ "${{ needs.meta.outputs.push_ghcr }}" = "true" ]; then
-              SRC_GH="$SRC_GH ${{ env.GHCR_REPO }}:${TAG}-win-23H2"
+              SRC_GH="$SRC_GH ${{ env.GHCR_REPO }}:${TAG}-win-ltsc2019"
             fi
           fi
           echo "dh=$SRC_DH" >> $GITHUB_OUTPUT
