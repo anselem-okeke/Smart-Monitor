@@ -7,7 +7,7 @@ permissions:
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - 'platform_infra/docker/orchestrator.linux.Dockerfile'
       - 'platform_infra/docker/entrypoint.sh'
