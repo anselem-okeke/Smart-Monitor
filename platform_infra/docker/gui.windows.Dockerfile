@@ -29,15 +29,20 @@ WORKDIR C:/app
 COPY gui/                                                   C:/app/gui/
 COPY db/                                                    C:/app/db/
 COPY scripts/                                               C:/app/scripts/
+COPY utils/                                                 C:/app/utils/
+COPY config/                                                C:/app/config/
+COPY logs/                                                  C:/app/logs/
 COPY requirements.txt                                       C:/app/requirements.txt
 COPY platform_infra/docker/entrypoint.gui.windows.ps1       C:/app/entrypoint.ps1
 COPY platform_infra/docker/healthcheck.gui.py               C:/app/healthcheck.py
+COPY main.py                                                C:/app/main.py
 
 # Use cmd for pip (simpler/faster)
 SHELL ["cmd","/S","/C"]
 RUN "C:\Python311\python.exe" -m pip install --upgrade pip wheel setuptools
 RUN "C:\Python311\python.exe" -m pip install -r C:\app\requirements.txt
 RUN "C:\Python311\python.exe" -m pip install waitress
+RUN "C:\Python311\python.exe" -m pip install utils
 
 # Back to PowerShell
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]

@@ -50,6 +50,10 @@ RUN python -m venv /venv \
 COPY gui/         ${APP_HOME}/gui/
 COPY db/          ${APP_HOME}/db/
 COPY scripts/     ${APP_HOME}/scripts/
+COPY utils/       ${APP_HOME}/utils/
+COPY config/      ${APP_HOME}/config/
+COPY logs/        ${APP_HOME}/logs/
+COPY main.py      ${APP_HOME}/main.py
 
 # Optional helper scripts
 COPY platform_infra/docker/entrypoint.gui.linux.sh   ${APP_HOME}/entrypoint.sh
