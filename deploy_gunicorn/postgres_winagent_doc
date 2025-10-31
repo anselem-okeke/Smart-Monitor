@@ -262,7 +262,7 @@ ERROR CASE:
               Remove-NetIPAddress -Confirm:$false
 
             # Give it a different, likely-free address (avoid conflicts)
-            New-NetIPAddress -InterfaceAlias $nic -IPAddress 192.168.56.30 -PrefixLength 24
+            New-NetIPAddress -InterfaceAlias $nic -IPAddress 192.168.56.35 -PrefixLength 24
 
             # Prefer this NIC for routing (lower metric than the NAT NIC)
             Set-NetIPInterface -InterfaceAlias $nic -InterfaceMetric 5
@@ -291,7 +291,7 @@ missing route for the 192.168.56.0/24 network.
     so use the classic route.exe instead.
         Add a persistent on-link route for 192.168.56.0/24, Use host-only interface index (IfIndex = 16 on “Ethernet 2”):
             # Add a persistent route via the host-only NIC (192.168.56.30), IF 16
-            route -p add 192.168.56.0 mask 255.255.255.0 192.168.56.30 if 16
+            route -p add 192.168.56.0 mask 255.255.255.0 192.168.56.35 if 16
 
             # Make sure the host-only NIC is preferred (lower metric) than the NAT NIC
             Set-NetIPInterface -InterfaceAlias "Ethernet 2" -InterfaceMetric 5

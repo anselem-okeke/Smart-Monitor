@@ -71,17 +71,7 @@ def _git_sha():
 def create_app():
     app = Flask(__name__)
 
-    # limiter = Limiter(get_remote_address, app=app, default_limits=[])
-    # limiter.limit("30/minute")(api_bp)
-
     app.config['SECRET_KEY'] = os.getenv('SMARTMON_SECRET_KEY') or secrets.token_hex(32)
-
-    # app.config["APP_NAME"]      = os.getenv("SMARTMONITOR_APP_NAME", "Smart Monitor")
-    # app.config["APP_VERSION"]   = os.getenv("SMARTMONITOR_VERSION", "0.1.0")
-    # app.config["AUTHOR_NAME"]   = os.getenv("SMARTMONITOR_AUTHOR_NAME", "Your Name")
-    # app.config["AUTHOR_URL"]    = os.getenv("SMARTMONITOR_AUTHOR_URL", "https://github.com/youruser")
-    # app.config["AUTHOR_AVATAR"] = os.getenv("SMARTMONITOR_AUTHOR_AVATAR", "")  # URL or empty to hide
-    # app.config["GIT_SHA"]       = _git_sha()
 
     @app.context_processor
     def inject_footer_vars():

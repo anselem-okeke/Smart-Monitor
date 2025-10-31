@@ -1,6 +1,5 @@
 .git
 **/__pycache__/
-**/*.pyc
 **/.venv/
 .env
 *.db
@@ -11,3 +10,24 @@ dist
 build
 .DS_Store
 
+# Python
+*.pyo
+*.pytest_cache/
+.env.*
+instance/
+logs/
+
+# Git/IDE
+.gitignore
+.vscode/
+.idea/
+
+# Node
+node_modules/
+**/node_modules/
+gui/frontend/.cache/
+gui/frontend/dist/
+gui/frontend/build/
+
+# Misc
+Thumbs.db

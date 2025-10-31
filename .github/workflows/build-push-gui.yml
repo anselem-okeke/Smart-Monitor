@@ -1,0 +1,183 @@
+name: Build & Push GUI image
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - 'gui/**'
+      - 'requirements.txt'
+      - 'platform_infra/docker/gui.linux.Dockerfile'
+      - 'platform_infra/docker/gui.windows.Dockerfile'
+      - 'platform_infra/docker/entrypoint.gui.linux.sh'
+      - 'platform_infra/docker/entrypoint.gui.windows.ps1'
+      - 'platform_infra/docker/healthcheck.gui.py'
+  workflow_dispatch:
+
+env:
+  IMAGE_GHCR: ghcr.io/${{ github.repository_owner }}/smartmon-gui
+  IMAGE_DH: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/smartmon-gui
+
+concurrency:
+  group: gui-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────
+  # Build & push Linux (multi-arch)
+  # ─────────────────────────────
+  build_linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push (Linux amd64+arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: platform_infra/docker/gui.linux.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_GHCR }}:amd64-arm64-linux
+            ${{ env.IMAGE_DH }}:amd64-arm64-linux
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────
+  # Build & push Windows LTSC 2022
+  # ─────────────────────────────
+  build_win_ltsc2022:
+    runs-on: windows-2022
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push (Windows/amd64 LTSC 2022)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: platform_infra/docker/gui.windows.Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_GHCR }}:win-ltsc2022
+            ${{ env.IMAGE_DH }}:win-ltsc2022
+
+  # ─────────────────────────────
+  # Build & push Windows LTSC 2025
+  # ─────────────────────────────
+  build_win_ltsc2025:
+    runs-on: windows-2025
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push (Windows/amd64 LTSC 2025)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: platform_infra/docker/gui.windows.Dockerfile
+          push: true
+          build-args: |
+            BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2025
+          tags: |
+            ${{ env.IMAGE_GHCR }}:win-ltsc2025
+            ${{ env.IMAGE_DH }}:win-ltsc2025
+
+  # ─────────────────────────────
+  # Create a cross-OS/arch :latest manifest
+  # (Linux amd64+arm64 + Windows LTSC 2022/2025)
+  # ─────────────────────────────
+  make_manifests:
+    needs: [build_linux, build_win_ltsc2022, build_win_ltsc2025]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create GHCR latest manifest (linux+win)
+        run: |
+          docker buildx imagetools create \
+            -t $IMAGE_GHCR:latest \
+            $IMAGE_GHCR:amd64-arm64-linux \
+            $IMAGE_GHCR:win-ltsc2022 \
+            $IMAGE_GHCR:win-ltsc2025
+        env:
+          IMAGE_GHCR: ${{ env.IMAGE_GHCR }}
+
+      - name: Create Docker Hub latest manifest (linux+win)
+        run: |
+          docker buildx imagetools create \
+            -t $IMAGE_DH:latest \
+            $IMAGE_DH:amd64-arm64-linux \
+            $IMAGE_DH:win-ltsc2022 \
+            $IMAGE_DH:win-ltsc2025
+        env:
+          IMAGE_DH: ${{ env.IMAGE_DH }}
+
