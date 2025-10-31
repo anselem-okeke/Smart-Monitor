@@ -68,73 +68,83 @@ jobs:
   # Build & push Windows LTSC 2022
   # ─────────────────────────────
   build_win_ltsc2022:
-    runs-on: windows-2022
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
+  runs-on: windows-2022
+  permissions:
+    contents: read
+    packages: write
+  env:
+    DOCKER_BUILDKIT: 0
+    IMAGE_GHCR: ghcr.io/${{ github.repository_owner }}/smartmon-gui
+    IMAGE_DH: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/smartmon-gui
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Login GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Login GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Login Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build & Push (Windows/amd64 LTSC 2022)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: platform_infra/docker/gui.windows.Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_GHCR }}:win-ltsc2022
-            ${{ env.IMAGE_DH }}:win-ltsc2022
+    - name: Build & Push (Windows LTSC 2022)
+      shell: pwsh
+      run: |
+        $tag1 = "${env:IMAGE_GHCR}:win-ltsc2022"
+        $tag2 = "${env:IMAGE_DH}:win-ltsc2022"
+        docker build \
+          --build-arg BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022 \
+          -f platform_infra/docker/gui.windows.Dockerfile \
+          -t $tag1 -t $tag2 .
+        docker push $tag1
+        docker push $tag2
 
   # ─────────────────────────────
   # Build & push Windows LTSC 2025
   # ─────────────────────────────
   build_win_ltsc2025:
-    runs-on: windows-2025
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
+  runs-on: windows-2025
+  permissions:
+    contents: read
+    packages: write
+  env:
+    DOCKER_BUILDKIT: 0
+    IMAGE_GHCR: ghcr.io/${{ github.repository_owner }}/smartmon-gui
+    IMAGE_DH: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/smartmon-gui
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Login GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Login GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Login Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build & Push (Windows/amd64 LTSC 2025)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: platform_infra/docker/gui.windows.Dockerfile
-          push: true
-          build-args: |
-            BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2025
-          tags: |
-            ${{ env.IMAGE_GHCR }}:win-ltsc2025
-            ${{ env.IMAGE_DH }}:win-ltsc2025
+    - name: Build & Push (Windows LTSC 2025)
+      shell: pwsh
+      run: |
+        $tag1 = "${env:IMAGE_GHCR}:win-ltsc2025"
+        $tag2 = "${env:IMAGE_DH}:win-ltsc2025"
+        docker build `
+          --build-arg BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2025 `
+          -f platform_infra/docker/gui.windows.Dockerfile `
+          -t $tag1 -t $tag2 .
+        docker push $tag1
+        docker push $tag2
 
   # ─────────────────────────────
   # Create a cross-OS/arch :latest manifest
