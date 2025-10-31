@@ -28,6 +28,7 @@ ENV PATH="C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v
 WORKDIR C:/app
 COPY gui/                                                   C:/app/gui/
 COPY db/                                                    C:/app/db/
+COPY scripts/                                               C:/app/scripts/
 COPY requirements.txt                                       C:/app/requirements.txt
 COPY platform_infra/docker/entrypoint.gui.windows.ps1       C:/app/entrypoint.ps1
 COPY platform_infra/docker/healthcheck.gui.py               C:/app/healthcheck.py
