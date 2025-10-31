@@ -13,7 +13,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     APP_HOME=C:\app \
     PORT=5003 \
-    GUNICORN_APP=gui.app:create_app
+    GUNICORN_APP=gui.app:create_app \
+    PYTHONPATH=C:\app
 
 # Chocolatey + Python
 RUN ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command","Set-ExecutionPolicy Bypass -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); choco feature enable -n=usePackageRepositoryOptimizations"]
@@ -34,7 +35,6 @@ COPY config/                                                C:/app/config/
 COPY requirements.txt                                       C:/app/requirements.txt
 COPY platform_infra/docker/entrypoint.gui.windows.ps1       C:/app/entrypoint.ps1
 COPY platform_infra/docker/healthcheck.gui.py               C:/app/healthcheck.py
-COPY main.py                                                C:/app/main.py
 
 # remove: COPY logs C:/app/logs
 RUN powershell -NoProfile -Command "New-Item -ItemType Directory -Path 'C:\app\logs','C:\app\instance' -Force | Out-Null"
@@ -44,7 +44,6 @@ SHELL ["cmd","/S","/C"]
 RUN "C:\Python311\python.exe" -m pip install --upgrade pip wheel setuptools
 RUN "C:\Python311\python.exe" -m pip install -r C:\app\requirements.txt
 RUN "C:\Python311\python.exe" -m pip install waitress
-RUN "C:\Python311\python.exe" -m pip install utils
 
 # Back to PowerShell
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]

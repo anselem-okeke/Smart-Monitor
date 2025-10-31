@@ -52,7 +52,6 @@ COPY db/          ${APP_HOME}/db/
 COPY scripts/     ${APP_HOME}/scripts/
 COPY utils/       ${APP_HOME}/utils/
 COPY config/      ${APP_HOME}/config/
-COPY main.py      ${APP_HOME}/main.py
 
 RUN mkdir -p /${APP_HOME}/logs /${APP_HOME}/instance
 
