@@ -41,9 +41,6 @@ RUN "C:\Python311\python.exe" -m pip install waitress
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 
 EXPOSE 5003
-HEALTHCHECK --interval=30s --timeout=6s --retries=5 CMD [
-  "powershell","-NoProfile","-ExecutionPolicy","Bypass",
-  "C:\\Python311\\python.exe","C:\\app\\healthcheck.py"
-]
+HEALTHCHECK --interval=30s --timeout=6s --retries=5 CMD ["powershell","-NoProfile","-ExecutionPolicy","Bypass","C:\\Python311\\python.exe","C:\\app\\healthcheck.py"]
 
 ENTRYPOINT ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","-NoProfile","-ExecutionPolicy","Bypass","-File","C:\\app\\entrypoint.ps1"]
