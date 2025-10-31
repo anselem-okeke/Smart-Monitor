@@ -52,8 +52,9 @@ COPY db/          ${APP_HOME}/db/
 COPY scripts/     ${APP_HOME}/scripts/
 COPY utils/       ${APP_HOME}/utils/
 COPY config/      ${APP_HOME}/config/
-COPY logs/        ${APP_HOME}/logs/
 COPY main.py      ${APP_HOME}/main.py
+
+RUN mkdir -p /${APP_HOME}/logs /${APP_HOME}/instance
 
 # Optional helper scripts
 COPY platform_infra/docker/entrypoint.gui.linux.sh   ${APP_HOME}/entrypoint.sh

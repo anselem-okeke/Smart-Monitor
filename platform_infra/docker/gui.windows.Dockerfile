@@ -31,11 +31,13 @@ COPY db/                                                    C:/app/db/
 COPY scripts/                                               C:/app/scripts/
 COPY utils/                                                 C:/app/utils/
 COPY config/                                                C:/app/config/
-COPY logs/                                                  C:/app/logs/
 COPY requirements.txt                                       C:/app/requirements.txt
 COPY platform_infra/docker/entrypoint.gui.windows.ps1       C:/app/entrypoint.ps1
 COPY platform_infra/docker/healthcheck.gui.py               C:/app/healthcheck.py
 COPY main.py                                                C:/app/main.py
+
+# remove: COPY logs C:/app/logs
+RUN powershell -NoProfile -Command "New-Item -ItemType Directory -Path 'C:\app\logs','C:\app\instance' -Force | Out-Null"
 
 # Use cmd for pip (simpler/faster)
 SHELL ["cmd","/S","/C"]
