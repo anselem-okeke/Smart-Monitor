@@ -2,7 +2,7 @@
 import os, sys, urllib.request, urllib.error
 
 PORT = int(os.environ.get("PORT", "5003"))
-HOST = os.environ.get("HEALTH_HOST", "0.0.0.0")
+HOST = os.environ.get("HEALTH_HOST", "127.0.0.1")
 PATH = os.environ.get("HEALTH_PATH", "/")  # set to "/healthz" if you have one
 TIMEOUT = float(os.environ.get("HEALTH_TIMEOUT", "5"))
 
