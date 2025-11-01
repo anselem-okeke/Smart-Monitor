@@ -39,6 +39,7 @@ New-Item -ItemType Directory -Path "C:\app\instance" -Force | Out-Null
 $cmd = @(
   'C:\Python311\Scripts\waitress-serve.exe',
   "--listen=0.0.0.0:$port",
+  '--call',
   $app
 )
 

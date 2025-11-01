@@ -10,5 +10,6 @@ mkdir -p "${APP_HOME:-/app}/logs" "${APP_HOME:-/app}/instance" || true
 
 exec /venv/bin/gunicorn \
   --config "${GUNICORN_CONFIG:-/app/gunicorn.conf.py}" \
+  --factory \
   "${GUNICORN_APP:-gui.app:create_app}"
 
