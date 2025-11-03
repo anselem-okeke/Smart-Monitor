@@ -47,11 +47,13 @@ RUN python -m venv /venv \
 
 # ── App code ─────────────────────────────────────────
 # Copy GUI package and config files
-COPY gui/         ${APP_HOME}/gui/
-COPY db/          ${APP_HOME}/db/
-COPY scripts/     ${APP_HOME}/scripts/
-COPY utils/       ${APP_HOME}/utils/
-COPY config/      ${APP_HOME}/config/
+COPY gui/                         ${APP_HOME}/gui/
+COPY db/                          ${APP_HOME}/db/
+COPY scripts/                     ${APP_HOME}/scripts/
+COPY utils/                       ${APP_HOME}/utils/
+COPY config/                      ${APP_HOME}/config/
+COPY gui/wsgi.py                  ${APP_HOME}/wsgi.py
+
 
 RUN mkdir -p /${APP_HOME}/logs /${APP_HOME}/instance
 

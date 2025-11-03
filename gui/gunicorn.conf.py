@@ -1,4 +1,6 @@
 import os, multiprocessing
+wsgi_app = "gui.wsgi:app"
+
 PORT = os.getenv("PORT", "5003")
 bind = os.getenv("GUNICORN_BIND", f"0.0.0.0:{PORT}")
 workers = int(os.getenv("WORKERS", os.getenv("WEB_CONCURRENCY", max(2, multiprocessing.cpu_count() // 2))))

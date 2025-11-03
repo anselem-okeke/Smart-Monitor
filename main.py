@@ -157,6 +157,7 @@ HANDLERS = [
         "fn": handle_service_recovery,
         "interval": 60,  # run every 60s
         "jitter": 0.10,
+        "timeout": 120,
         "next": 0.0,
     },
 
@@ -304,7 +305,7 @@ def main():
         if run_once:
             break
         # sleep exactly until something is due (with clamps)
-        sleep_for = max(IDLE_MAX, min(IDLE_MIN, next_due - monotonic()))
+        sleep_for = min(IDLE_MAX, max(IDLE_MIN, next_due - monotonic()))
         time.sleep(sleep_for)
 
     log.info("orchestrator stopped. bye.")

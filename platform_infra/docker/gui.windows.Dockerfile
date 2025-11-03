@@ -8,6 +8,7 @@ LABEL org.opencontainers.image.title="Smart Monitor GUI" \
       org.opencontainers.image.source="https://github.com/anselem-okeke/Smart-Monitor" \
       org.opencontainers.image.licenses="MIT"
 
+# ── Runtime env knobs (safe defaults; override at run) ──
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \

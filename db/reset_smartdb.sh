@@ -1,5 +1,5 @@
 #!/bin/bash 
-
+#Run script with admin rights ---> sudo -s db/reset_smartdb.sh
 set -euo pipefail
 
 DB_NAME="${DB_NAME:-smartdb}"
