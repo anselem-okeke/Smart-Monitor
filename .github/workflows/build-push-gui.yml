@@ -2,7 +2,7 @@ name: Build & Push GUI image
 
 on:
   push:
-    branches: ["**"]
+    branches: [dev]                #-->all branches ["**"]
     tags: ["v*"]
     paths:
       - "gui/**"
