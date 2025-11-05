@@ -15,7 +15,7 @@ build
 *.pytest_cache/
 .env.*
 instance/
-logs/
+
 
 # Git/IDE
 .gitignore
