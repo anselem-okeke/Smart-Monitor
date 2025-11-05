@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Minimal systemctl-compatible shim that talks to host systemd via busctl.
+# It implements:
+#   - systemctl is-active <unit>
+#   - systemctl is-enabled <unit>   (best-effort)
+#   - systemctl show <unit>         (prints the 4 fields your parser needs)
+
+cmd="${1:-}"
+unit="${2:-}"
+
+# Map typical shortcuts (nginx -> nginx.service)
+if [[ "${unit:-}" != *.service && -n "${unit:-}" ]]; then
+  unit="${unit}.service"
+fi
+
+get_unit_path() {
+  local u="$1"
+  # Ask systemd to resolve the unit name to an object path
+  local out
+  if ! out=$(busctl --system call org.freedesktop.systemd1 \
+      /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager \
+      GetUnit s "$u" 2>/dev/null); then
+    echo ""
+    return 1
+  fi
+  # Output looks like: o "/org/freedesktop/systemd1/unit/ssh_2eservice"
+  echo "$out" | awk -F'"' '{print $2}'
+}
+
+case "$cmd" in
+  is-active)
+    path=$(get_unit_path "$unit") || { echo "unknown"; exit 0; }
+    # ActiveState
+    state=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+            org.freedesktop.systemd1.Unit ActiveState | awk '{print $2}' | tr -d '"')
+    echo "${state:-unknown}"
+    ;;
+
+  is-enabled)
+    # UnitFileState is on the UnitFile interface if present; fall back to unknown
+    path=$(get_unit_path "$unit") || { echo "unknown"; exit 0; }
+    uf=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+          org.freedesktop.systemd1.UnitFileState UnitFileState 2>/dev/null \
+          | awk '{print $2}' | tr -d '"' ) || true
+    echo "${uf:-unknown}"
+    ;;
+
+  show)
+    path=$(get_unit_path "$unit") || {
+      # Print the four fields with 'unknown' so your parser still sees keys
+      printf "ActiveState=unknown\nSubState=unknown\nType=unknown\nUnitFileState=unknown\n"
+      exit 0
+    }
+
+    active=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+              org.freedesktop.systemd1.Unit ActiveState | awk '{print $2}' | tr -d '"')
+    sub=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+              org.freedesktop.systemd1.Unit SubState | awk '{print $2}' | tr -d '"')
+    type=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+              org.freedesktop.systemd1.Service Type 2>/dev/null | awk '{print $2}' | tr -d '"' )
+    # UnitFileState isn’t on every unit; best-effort:
+    uf=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+            org.freedesktop.systemd1.UnitFileState UnitFileState 2>/dev/null \
+            | awk '{print $2}' | tr -d '"' ) || true
+
+    printf "ActiveState=%s\n" "${active:-unknown}"
+    printf "SubState=%s\n"     "${sub:-unknown}"
+    printf "Type=%s\n"         "${type:-unknown}"
+    printf "UnitFileState=%s\n" "${uf:-unknown}"
+    ;;
+
+  *)
+    echo "usage: systemctl-shim {is-active|is-enabled|show} <unit>" >&2
+    exit 2
+    ;;
+esac
+

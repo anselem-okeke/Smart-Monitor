@@ -45,5 +45,11 @@ log "Database reachable."
 
 # Launch orchestrator main script
 log "Running main orchestrator loop..."
+
+# Prefer Postgres if DATABASE_URL is present
+if [ -n "${DATABASE_URL:-}" ]; then
+  unset SMARTMONITOR_DB_PATH
+fi
+
 exec python3 /app/main.py
 
