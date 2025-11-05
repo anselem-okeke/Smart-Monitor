@@ -60,7 +60,7 @@ RUN chmod +x /app/entrypoint.sh || true
 FROM base AS linux
 ARG OS=linux
 RUN echo "[BUILD] Linux Orchestrator" && \
-    apt-get update && apt-get install -y systemctl dbus util-linux smartmontools --no-install-recommends \
+    apt-get update && apt-get install -y systemd dbus util-linux smartmontools --no-install-recommends \
         ca-certificates curl tzdata procps && \
     rm -rf /var/lib/apt/lists/*
 

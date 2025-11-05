@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Minimal "systemctl is-active <unit>" over D-Bus
+set -euo pipefail
+cmd="${1:-}"; unit="${2:-}"
+if [[ "${cmd:-}" != "is-active" || -z "${unit:-}" ]]; then
+  echo "Usage: systemctl is-active <unit>" >&2
+  exit 2
+fi
+seg=$(printf %s "$unit" | sed 's/\./_2e/g')
+path="/org/freedesktop/systemd1/unit/${seg}"
+# Returns: active|inactive|failed|activating|deactivating|maintenance
+state=$(busctl --system get-property \
+  org.freedesktop.systemd1 "$path" org.freedesktop.systemd1.Unit ActiveState \
+  | awk '{print $2}' | tr -d '"')
+
+# Normalize states to what your code expects
+case "$state" in
+  active)        echo active;        exit 0 ;;
+  inactive|dead) echo inactive;      exit 3 ;;
+  failed)        echo failed;        exit 3 ;;
+  activating)    echo activating;    exit 0 ;;
+  deactivating)  echo deactivating;  exit 0 ;;
+  maintenance)   echo maintenance;   exit 3 ;;
+  *)             echo unknown;       exit 4 ;;
+esac

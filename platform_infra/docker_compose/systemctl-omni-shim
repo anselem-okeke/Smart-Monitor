@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# A minimal systemctl shim that understands:
+#   • systemctl is-active <unit>
+#   • systemctl list-units --type=service --no-legend
+# It talks to host systemd via the system bus (requires /run/dbus/system_bus_socket mounted).
+set -euo pipefail
+
+normalize_unit() {
+  local u="$1"
+  printf %s "$u" | sed 's/\./_2e/g'
+}
+
+is_active() {
+  local unit="$1"
+  local seg; seg=$(normalize_unit "$unit")
+  local path="/org/freedesktop/systemd1/unit/${seg}"
+  local state
+  state=$(busctl --system get-property \
+      org.freedesktop.systemd1 "$path" org.freedesktop.systemd1.Unit ActiveState \
+      | awk '{print $2}' | tr -d '"') || state="unknown"
+
+  case "$state" in
+    active)        echo active;        exit 0 ;;
+    inactive|dead) echo inactive;      exit 3 ;;
+    failed)        echo failed;        exit 3 ;;
+    activating)    echo activating;    exit 0 ;;
+    deactivating)  echo deactivating;  exit 0 ;;
+    maintenance)   echo maintenance;   exit 3 ;;
+    *)             echo unknown;       exit 4 ;;
+  esac
+}
+
+list_units_services() {
+  # Print in a systemctl-like no-legend format with columns:
+  # UNIT LOAD ACTIVE SUB DESCRIPTION
+  # Your parser likely reads these 5 columns.
+  # We’ll fetch via ListUnits and render similarly.
+  busctl --system call org.freedesktop.systemd1 \
+    /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager ListUnits \
+    | tail -n +2 | sed 's/^a(//' | tr -d ')' \
+    | awk '
+      BEGIN { RS="), ("; FS="," }
+      {
+        # Fields (rough parse of D-Bus signature):
+        # 1: id (unit name)
+        # 2: description
+        # 3: load state
+        # 4: active state
+        # 5: sub state
+        # Others not used.
+        # Clean quotes/spaces
+        gsub(/^[[:space:]]*"/,"",$1); gsub(/"$/,"",$1);
+        gsub(/^[[:space:]]*"/,"",$2); gsub(/"$/,"",$2);
+        gsub(/^[[:space:]]*"/,"",$3); gsub(/"$/,"",$3);
+        gsub(/^[[:space:]]*"/,"",$4); gsub(/"$/,"",$4);
+        gsub(/^[[:space:]]*"/,"",$5); gsub(/"$/,"",$5);
+
+        unit=$1; desc=$2; load=$3; act=$4; sub=$5;
+        if (unit ~ /\.service$/) {
+          printf "%s %s %s %s %s\n", unit, load, act, sub, desc;
+        }
+      }'
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  is-active)
+    unit="${2:-}"
+    if [[ -z "$unit" ]]; then
+      echo "Usage: systemctl is-active <unit>" >&2; exit 2
+    fi
+    is_active "$unit"
+    ;;
+  list-units)
+    # We only implement the common query your app uses
+    # systemctl list-units --type=service --no-legend
+    # Ignore flags; always print services in no-legend format
+    list_units_services
+    ;;
+  *)
+    echo "Unsupported systemctl command in shim: $*" >&2
+    echo "Supported: is-active <unit> | list-units --type=service --no-legend" >&2
+    exit 2
+    ;;
+esac

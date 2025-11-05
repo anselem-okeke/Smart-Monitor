@@ -1,0 +1,181 @@
+version: "3.9"
+
+# ---------- shared defaults ----------
+x-env-common: &env_common
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DRY_RUN: ${DRY_RUN:-true}
+
+x-env-db: &env_db
+  DATABASE_URL: ${DATABASE_URL_INTERNAL}
+
+x-gui-env: &gui_env
+  <<: [*env_common, *env_db]
+  PORT: ${GUI_PORT:-5003}
+  PYTHONPATH: /app
+  GUNICORN_CONFIG: /app/gui/gunicorn.conf.py
+  SMARTMON_API_KEY: ${SMARTMON_API_KEY:?set in .env}
+  SMARTMON_APPROVED_JSON: /app/config/approved_services.json
+
+networks:
+  smartnet: {}
+
+volumes:
+  pgdata: {}
+
+services:
+  # ---------- Postgres ----------
+  postgres:
+    image: postgres:15
+    container_name: sm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-smartdb}
+      POSTGRES_USER: ${DB_USER:-smart}
+      POSTGRES_PASSWORD: ${DB_PASS:-smartpass}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-smart} -d ${DB_NAME:-smartdb} -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [smartnet]
+
+  # ---------- GUI (Gunicorn inside image) ----------
+  gui:
+    image: ${GUI_IMAGE:? ghcr.io/smartmon-gui:linux}
+    container_name: sm-gui
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *gui_env
+    volumes:
+      # approved services policy (host file → container path)
+      - ${APPROVED_JSON_HOST:?abs path on host}:/app/config/approved_services.json:ro
+      - ${APP_META_HOST}:/app/config/app_meta.json:ro
+    healthcheck:
+      test: ["CMD", "/venv/bin/python", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+    networks: [smartnet]
+
+  # ---------- Nginx (fronts GUI only inside network) ----------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sm-nginx
+    depends_on:
+      - gui
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ${NGINX_SITE_CONF:?point to site.conf}:/etc/nginx/conf.d/default.conf:ro
+      # optional TLS (if terminating locally)
+      # - ${TLS_FULLCHAIN:-/etc/letsencrypt/live/yourhost/fullchain.pem}:/etc/nginx/tls/fullchain.pem:ro
+      # - ${TLS_PRIVKEY:-/etc/letsencrypt/live/yourhost/privkey.pem}:/etc/nginx/tls/privkey.pem:ro
+    networks: [smartnet]
+
+  # ---------- Cloudflared (optional, use when not exposing 80/443) ----------
+  cloudflared:
+    image: cloudflare/cloudflared:2024.10.0
+    container_name: sm-cloudflared
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - /etc/cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - nginx
+    networks:
+      - smartnet
+
+  # ============================================================
+  # PROD profile (locked-down orchestrator: reads systemd state)
+  # ============================================================
+  orchestrator:
+    image: ${ORCH_IMAGE:?e.g. ghcr.io/you/smartmon-orchestrator:linux}
+    container_name: sm-orchestrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["prod"]
+    user: "1000:1000"                 # non-root in image
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt:
+      - "no-new-privileges:true"
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /run:size=16m,mode=755
+    environment:
+      <<: [*env_common, *env_db]
+      SMARTMON_INIT_PG: ${SMARTMON_INIT_PG:-0}
+      # tell code to read host metrics via these roots
+      SMARTMON_API_KEY: ${SMARTMON_API_KEY:?set in .env}
+      PROCFS_ROOT: /host/proc
+      SYSFS_ROOT: /host/sys
+      SERVICE_STATUS_MODE: systemd     # read-only systemd introspection
+      SMARTCTL: /usr/sbin/smartctl
+      SMARTCTL_USE_SUDO: "0"
+    volumes:
+      # host metrics (read-only)
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      # D-Bus sockets for systemd READ access
+      - /run/systemd:/run/systemd:ro
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
+      # policy for restart allow-list (still enforced in app)
+      - ${APPROVED_JSON_HOST}:/app/config/approved_services.json:ro
+    healthcheck:
+      test: ["CMD", "python3", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+    networks: [smartnet]
+
+  # NOTE: In PROD, **restarts & smartctl with root** should be done by a tiny host helper (systemd unit)
+  # that exposes a UNIX/TCP socket with an API key. The orchestrator calls that helper.
+  # (We keep it outside Compose for security — not shown here.)
+
+  # ============================================================
+  # LAB profile (privileged orchestrator: restarts & SMART)
+  # ============================================================
+  orchestrator_lab:
+    image: ${ORCH_IMAGE}
+    container_name: sm-orchestrator-lab
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["lab"]
+    privileged: true           # you accept full host control in lab
+    pid: "host"
+    uts: "host"
+    user: "0:0"
+    environment:
+      <<: [*env_common, *env_db]
+      SMARTMON_INIT_PG: ${SMARTMON_INIT_PG:-0}
+      SMARTMON_API_KEY: ${SMARTMON_API_KEY:?set in .env}
+      PROCFS_ROOT: /host/proc
+      SYSFS_ROOT: /host/sys
+      SERVICE_STATUS_MODE: systemd
+      SMARTCTL: /usr/sbin/smartctl
+      #SERVICE_STATUS_CMD: /usr/local/bin/systemctl-shim
+      SMARTCTL_USE_SUDO: "0"
+      SYSTEMCTL_FORCE_BUS: "1"
+      SERVICE_STATUS_DEBUG: "1"
+      DBUS_SYSTEM_BUS_ADDRESS: "unix:path=/run/dbus/system_bus_socket"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /run/systemd:/run/systemd            # writable; systemctl control
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+      - /dev:/dev                            # SMART device access
+      - /etc/machine-id:/etc/machine-id:ro
+      - ${APPROVED_JSON_HOST}:/app/config/approved_services.json:ro
+      #- /vagrant/Smart-Monitor/platform_infra/docker_compose/systemctl-active-shim:/usr/local/bin/systemctl-shim:ro
+    healthcheck:
+      test: ["CMD", "python3", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+    networks: [smartnet]
+

@@ -1,0 +1,13 @@
+{
+  "app_name": "Smart Monitor Console",
+  "app_version": "v0.1.0",
+  "copyright_owner": "Anselem Okeke",
+  "powered_by": "Flask & PostgreSQL",
+  "project_url": "https://github.com/anselem-okeke/Smart-Monitor",
+  "owner_url": "https://www.linkedin.com/in/anselem-okeke/",
+  "docs": {
+    "flask": "https://flask.palletsprojects.com",
+    "postgres": "https://www.postgresql.org/docs/"
+  }
+}
+
