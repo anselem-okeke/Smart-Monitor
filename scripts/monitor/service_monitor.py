@@ -4,6 +4,7 @@ import socket
 import subprocess
 import sys
 import time
+from datetime import datetime
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if PROJECT_ROOT not in sys.path:
@@ -11,173 +12,198 @@ if PROJECT_ROOT not in sys.path:
 
 from db.db_logger import log_service_status_batch
 
-from datetime import datetime
+# ---------- helpers ----------
 
-# def normalize_service_status(os_platform, raw_status):
-#     raw_status = raw_status.lower()
-#     if os_platform == "Windows":
-#         if raw_status == "running":
-#             return "active"
-#         elif raw_status == "stopped":
-#             return "stopped"
-#         else:
-#             return "unknown"
-#     else:
-#         active_states = ["running", "exited", "activating", "listening", "waiting", "start"]
-#         inactive_states = ["dead", "auto-restart", "inactive"]
-#         failed_states = ["failed"]
-#
-#         if raw_status in active_states:
-#             return "active"
-#         elif raw_status in inactive_states:
-#             return "stopped"
-#         elif raw_status in failed_states:
-#             return "failed"
-#         else:
-#             return "unknown"
-#
-# def collect_service_status():
-#     os_platform = platform.system()
-#     hostname = socket.gethostname()
-#     services = []
-#
-#     if os_platform == "Windows":
-#         try:
-#             output = subprocess.check_output("sc query state= all", shell=True, text=True)
-#             service_name, state = None, None
-#
-#             for line in output.splitlines():
-#                 line = line.strip()
-#
-#                 # Pick up the current SERVICE_NAME
-#                 if line.startswith("SERVICE_NAME:"):
-#                     service_name = line.partition(":")[2].strip()
-#
-#                 # Pick up the STATE numeric + word (e.g. 1  STOPPED)
-#                 elif line.startswith("STATE") and service_name:
-#                     # after the colon you get “4  RUNNING” or “1  STOPPED”
-#                     after_colon = line.partition(":")[2].strip()
-#                     # split once → num  word
-#                     parts = after_colon.split(None, 1)
-#                     if len(parts) == 2:
-#                         state = parts[1].strip()  # RUNNING / STOPPED / START_PENDING …
-#
-#                         normalized = normalize_service_status("Windows", state)
-#                         services.append({
-#                             "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-#                             "hostname": hostname,
-#                             "os_platform": os_platform,
-#                             "service_name": service_name,
-#                             "raw_status": state,
-#                             "normalized_status": normalized
-#                         })
-#
-#                     # reset for next service block
-#                     service_name, state = None, None
-#
-#
-#         # if os_platform == "Windows":
-#     #     try:
-#     #         output = subprocess.check_output("sc query state= all", shell=True, text=True)
-#     #         lines = output.splitlines()
-#     #         service_name = None
-#     #
-#     #         for line in lines:
-#     #             line = line.strip()
-#     #             if line.startswith("SERVICE_NAME:"):
-#     #                 service_name = line.split("SERVICE_NAME:")[1].strip()
-#     #             elif line.startswith("STATE") and service_name:
-#     #                 # Correct parsing: split on ':' first, then split the value part
-#     #                 parts = line.split(":", 1)
-#     #                 if len(parts) > 1:
-#     #                     status_parts = parts[1].strip().split()
-#     #                     if len(status_parts) >= 2:
-#     #                         state = status_parts[1].strip()  # Should be 'RUNNING', 'STOPPED', etc.
-#     #                         normalized = normalize_service_status("Windows", state)
-#     #                         services.append({
-#     #                             "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-#     #                             "hostname": socket.gethostname(),
-#     #                             "os_platform": os_platform,
-#     #                             "service_name": service_name,
-#     #                             "raw_status": state,
-#     #                             "normalized_status": normalized
-#     #                         })
-#     #                         service_name = None  # Reset for next
-#         except Exception as e:
-#             print(f"[ERROR] Failed to collect Windows services: {e}")
-#
-#
-#     else:  # Linux
-#         try:
-#             # Get plain service names first
-#             unit_names = subprocess.check_output(
-#                 "systemctl list-unit-files --type=service --no-legend --no-pager",
-#                 shell=True, text=True
-#             ).splitlines()
-#
-#             for row in unit_names:
-#                 # each row: "cron.service   nginx.service     enabled"
-#                 svc_name = row.split()[0]  # always first token
-#
-#                 if '@' in svc_name and not svc_name.rstrip().endswith('.service'):
-#                     continue
-#                 try:
-#                     svc_show = subprocess.check_output(
-#                         f"systemctl show {svc_name} --property=ActiveState --value",
-#                         shell=True, text=True
-#                     ).strip()  # e.g. "active", "inactive", "failed"
-#
-#                     raw_status = svc_show.lower()
-#                     normalized = normalize_service_status("Linux", raw_status)
-#
-#                     services.append({
-#                         "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-#                         "hostname": hostname,
-#                         "os_platform": os_platform,
-#                         "service_name": svc_name,
-#                         "raw_status": raw_status,
-#                         "normalized_status": normalized
-#                     })
-#                 except subprocess.CalledProcessError as svc_err:
-#                     print(f"[WARN] Could not query {svc_name}: {svc_err.stderr.strip()}")
-#
-#         except Exception as e:
-#             print(f"[ERROR] Failed to collect Linux services: {e}")
-#
-#         #     output = subprocess.check_output(
-#         #         "systemctl list-units --type=service --no-legend --no-pager",
-#         #         shell=True, text=True
-#         #     )
-#         #     for line in output.splitlines():
-#         #         parts = line.split(None, 4)  # Split into at most 5 parts
-#         #         if len(parts) >= 4:
-#         #             service_name = parts[0]
-#         #             raw_status = parts[3]  # This is the ACTIVE column
-#         #             normalized = normalize_service_status("Linux", raw_status)
-#         #
-#         #             services.append({
-#         #                 "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-#         #                 "hostname": hostname,
-#         #                 "os_platform": os_platform,
-#         #                 "service_name": service_name,
-#         #                 "raw_status": raw_status,
-#         #                 "normalized_status": normalized
-#         #             })
-#         # except Exception as e:
-#         #     print(f"[ERROR] Failed to collect Linux services: {e}")
-#
-#     return services
-#
-# if __name__ == '__main__':
-#     print(f"[INFO] Starting Service Monitor...")
-#     try:
-#         while True:
-#             process_data = collect_service_status()
-#             log_service_status_batch(process_data)
-#             print("[INFO] Service status logged successfully")
-#             time.sleep(60)
-#     except KeyboardInterrupt:
-#         print("[INFO] Service monitory stopped by user.")
+def _map_active_to_normalized(active_state: str) -> str:
+    s = (active_state or "").strip().lower()
+    if s in ("active", "running", "listening"):
+        return "running"
+    if s in ("inactive", "dead", "exited"):
+        return "stopped"
+    if s in ("failed",):
+        return "failed"
+    if s in ("activating", "deactivating", "start", "waiting"):
+        # mapped to "running" or as "unknown"
+        return "running"
+    return "unknown"
+
+def normalize_service_status(os_platform: str, raw_status: str) -> str:
+    if os_platform == "Windows":
+        return "running" if (raw_status or "").lower() == "running" else \
+               "stopped" if (raw_status or "").lower() == "stopped" else "unknown"
+    return _map_active_to_normalized(raw_status)
+
+def _linux_list_units_systemctl():
+    """Fallback listing via systemctl (container often lies)."""
+    out = subprocess.check_output(
+        ["bash", "-lc", "systemctl list-unit-files --type=service --no-legend --no-pager"],
+        text=True
+    )
+    units = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        name = line.split()[0]
+        if name.endswith("@.service"):
+            continue
+        units.append(name)
+    return units
+
+def _linux_show_via_systemctl(unit: str):
+    """Fallback details via systemctl show (may be unreliable in containers)."""
+    res = subprocess.run(
+        ["systemctl", "show", unit, "--property=ActiveState,SubState,Type,UnitFileState"],
+        capture_output=True, text=True, timeout=6
+    )
+    if res.returncode != 0:
+        return {"ActiveState": "unknown", "SubState": "unknown", "Type": "unknown", "UnitFileState": "unknown"}
+    fields = dict(
+        (k.strip(), v.strip())
+        for line in res.stdout.splitlines() if "=" in line
+        for k, v in [line.split("=", 1)]
+    )
+    return {
+        "ActiveState": fields.get("ActiveState", "unknown"),
+        "SubState": fields.get("SubState", "unknown"),
+        "Type": fields.get("Type", "unknown"),
+        "UnitFileState": fields.get("UnitFileState", "unknown"),
+    }
+
+def _linux_show_via_cmd(unit: str):
+    """
+    Use an external command (your shim) that talks to systemd over D-Bus.
+    Requires:
+      SERVICE_STATUS_CMD=/usr/local/bin/systemctl-shim
+      DBUS_SYSTEM_BUS_ADDRESS mounted, etc.
+    """
+    cmd = os.getenv("SERVICE_STATUS_CMD", "/usr/local/bin/systemctl-shim")
+
+    # Try quick 'is-active' first
+    try:
+        raw = subprocess.check_output([cmd, "is-active", unit], text=True, timeout=4).strip()
+    except subprocess.CalledProcessError as e:
+        raw = (e.output or "unknown").strip()
+    except Exception as e:
+        print(f"{e}")
+        raw = "unknown"
+
+    sub_state = "unknown"
+    svc_type = "unknown"
+    ufs = "unknown"
+    try:
+        out = subprocess.check_output([cmd, "show", unit], text=True, timeout=6)
+        kv = dict(
+            (k.strip(), v.strip())
+            for line in out.splitlines() if "=" in line
+            for k, v in [line.split("=", 1)]
+        )
+        sub_state = kv.get("SubState", sub_state)
+        svc_type = kv.get("Type", svc_type)
+        ufs = kv.get("UnitFileState", ufs)
+        if raw in ("", "unknown"):
+            raw = kv.get("ActiveState", raw or "unknown")
+    except Exception as e:
+        print(f"{e}")
+        pass
+
+    return raw, sub_state, svc_type, ufs
+
+def collect_windows_services():
+    services = []
+    try:
+        output = subprocess.check_output("sc.exe query state= all", shell=True, text=True)
+        service_name = None
+        for line in output.splitlines():
+            line = line.strip()
+            if line.startswith("SERVICE_NAME:"):
+                service_name = line.partition(":")[2].strip()
+            elif line.startswith("STATE") and service_name:
+                parts = line.partition(":")[2].strip().split(None, 1)
+                if len(parts) == 2:
+                    raw_state = parts[1].strip()
+                    services.append((service_name, raw_state, "unknown", "unknown", "unknown", True))
+                service_name = None
+    except Exception as exc:
+        print(f"[ERROR] Windows service query failed: {exc}")
+    return services
+
+def collect_linux_services():
+    """
+    Linux collector that can run in two modes:
+      - SERVICE_STATUS_MODE=cmd  → call shim (recommended in container lab)
+      - SERVICE_STATUS_MODE=systemd → old systemctl path (fallback)
+    """
+    mode = os.getenv("SERVICE_STATUS_MODE", "systemd").lower()
+    watch_env = os.getenv("SMARTMON_SERVICE_WATCH", "")
+    watch_list = [w.strip() for w in watch_env.split(",") if w.strip()]
+    services = []
+
+    # Decide unit list
+    units = watch_list if watch_list else _linux_list_units_systemctl()
+
+    for svc_name in units:
+        try:
+            if mode == "cmd":
+                active, sub_state, service_type, unit_file_state = _linux_show_via_cmd(svc_name)
+            else:
+                info = _linux_show_via_systemctl(svc_name)
+                active = info["ActiveState"]
+                sub_state = info["SubState"]
+                service_type = info["Type"]
+                unit_file_state = info["UnitFileState"]
+
+            recoverable = (
+                service_type not in ("oneshot", "notify") and
+                unit_file_state not in ("static", "masked")
+            )
+            services.append((svc_name, active, sub_state, service_type, unit_file_state, recoverable))
+        except Exception as exc:
+            print(f"[WARN] Could not query {svc_name}: {exc}")
+    return services
+
+# ---------- main flow ----------
+
+def collect_service_status():
+    os_platform = platform.system()
+    hostname = socket.gethostname()
+    if os_platform == "Windows":
+        collected = collect_windows_services()
+    else:
+        collected = collect_linux_services()
+
+    rows = []
+    for svc_name, active_state, sub_state, service_type, unit_file_state, recoverable in collected:
+        rows.append({
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "hostname": hostname,
+            "os_platform": os_platform,
+            "service_name": svc_name,
+            "raw_status": (active_state or "unknown").lower(),
+            "normalized_status": normalize_service_status(os_platform, active_state),
+            "sub_state": sub_state or "unknown",
+            "service_type": service_type or "unknown",
+            "unit_file_state": unit_file_state or "unknown",
+            "recoverable": 1 if recoverable else 0,
+        })
+    return rows
+
+def handle_service_monitor():
+    batch = collect_service_status()
+    if batch:
+        log_service_status_batch(batch)
+        print(f"[INFO] Logged {len(batch)} service rows → DB; sleeping 60s...")
+    else:
+        print("[INFO] No services collected this cycle; sleeping 60s...")
+
+if __name__ == "__main__":
+    print("[INFO] Service Monitor starting …")
+    try:
+        while True:
+            handle_service_monitor()
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("[INFO] Service Monitor stopped by user.")
 
 
 
@@ -192,6 +218,47 @@ from datetime import datetime
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# import os
+# import platform
+# import socket
+# import subprocess
+# import sys
+# import time
+#
+# PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+# if PROJECT_ROOT not in sys.path:
+#     sys.path.insert(0, PROJECT_ROOT)
+#
+# from db.db_logger import log_service_status_batch
+#
+# from datetime import datetime
+#
+#
 # def normalize_service_status(os_platform: str, raw_status: str) -> str:
 #     raw_status = raw_status.lower()
 #
@@ -212,7 +279,7 @@ from datetime import datetime
 #     return "unknown"
 #
 #
-# def collect_windows_services() -> list:
+# def collect_windows_services():
 #     services = []
 #     try:
 #         output = subprocess.check_output("sc.exe query state= all", shell=True, text=True)
@@ -222,18 +289,17 @@ from datetime import datetime
 #             if line.startswith("SERVICE_NAME:"):
 #                 service_name = line.partition(":")[2].strip()
 #             elif line.startswith("STATE") and service_name:
-#                 # "STATE              : 1  STOPPED" → split once after ':'
 #                 parts = line.partition(":")[2].strip().split(None, 1)
 #                 if len(parts) == 2:
-#                     raw_state = parts[1].strip()  # e.g. RUNNING / STOPPED / START_PENDING
-#                     services.append((service_name, raw_state))
+#                     raw_state = parts[1].strip()
+#                     # Dummy values for unsupported metadata on Windows
+#                     services.append((service_name, raw_state, "unknown", "unknown", "unknown", True))
 #                 service_name = None
 #     except Exception as exc:
 #         print(f"[ERROR] Windows service query failed: {exc}")
 #     return services
 #
-#
-# def collect_linux_services() -> list:
+# def collect_linux_services():
 #     services = []
 #     try:
 #         unit_rows = subprocess.check_output(
@@ -246,24 +312,41 @@ from datetime import datetime
 #             if not row:
 #                 continue
 #             svc_name = row.split()[0]
-#             # Skip template units without concrete instance
 #             if svc_name.endswith("@.service"):
 #                 continue
+#
 #             res = subprocess.run([
-#                 "systemctl", "show", svc_name, "--property=ActiveState", "--value"
+#                 "systemctl", "show", svc_name,
+#                 "--property=ActiveState,SubState,Type,UnitFileState"
 #             ], capture_output=True, text=True)
+#
 #             if res.returncode != 0:
 #                 warn = (res.stderr or res.stdout).strip()
 #                 print(f"[WARN] Could not query {svc_name}: {warn}")
 #                 continue
-#             raw_state = res.stdout.strip()
-#             services.append((svc_name, raw_state))
+#
+#             parsed = dict(
+#                 (key.strip(), value.strip())
+#                 for line in res.stdout.strip().splitlines() if "=" in line
+#                 for key, value in [line.split("=", 1)]
+#             )
+#
+#             active_state = parsed.get("ActiveState", "unknown")
+#             sub_state = parsed.get("SubState", "unknown")
+#             service_type = parsed.get("Type", "unknown")
+#             unit_file_state = parsed.get("UnitFileState", "unknown")
+#
+#             recoverable = (
+#                 service_type not in ["oneshot", "notify"] and
+#                 unit_file_state not in ["static", "masked"]
+#             )
+#
+#             services.append((svc_name, active_state, sub_state, service_type, unit_file_state, recoverable))
 #     except Exception as exc:
 #         print(f"[ERROR] Linux service collection failed: {exc}")
 #     return services
 #
-#
-# def collect_service_status() -> list:
+# def collect_service_status():
 #     os_platform = platform.system()
 #     hostname = socket.gethostname()
 #
@@ -273,161 +356,37 @@ from datetime import datetime
 #         collected = collect_linux_services()
 #
 #     rows = []
-#     for svc_name, raw_state in collected:
+#     for svc_name, active_state, sub_state, service_type, unit_file_state, recoverable in collected:
 #         rows.append({
 #             "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
 #             "hostname": hostname,
 #             "os_platform": os_platform,
 #             "service_name": svc_name,
-#             "raw_status": raw_state.lower(),
-#             "normalized_status": normalize_service_status(os_platform, raw_state),
+#             "raw_status": active_state.lower(),
+#             "normalized_status": normalize_service_status(os_platform, active_state),
+#             "sub_state": sub_state,
+#             "service_type": service_type,
+#             "unit_file_state": unit_file_state,
+#             "recoverable": 1 if recoverable else 0
 #         })
 #     return rows
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def normalize_service_status(os_platform: str, raw_status: str) -> str:
-    raw_status = raw_status.lower()
-
-    if os_platform == "Windows":
-        return "active" if raw_status == "running" else "stopped" if raw_status == "stopped" else "unknown"
-
-    # Linux mapping
-    active_states = {"active", "running", "exited", "listening", "waiting", "start", "activating"}
-    inactive_states = {"dead", "inactive", "auto-restart"}
-    failed_states = {"failed"}
-
-    if raw_status in active_states:
-        return "active"
-    if raw_status in inactive_states:
-        return "stopped"
-    if raw_status in failed_states:
-        return "failed"
-    return "unknown"
-
-
-def collect_windows_services():
-    services = []
-    try:
-        output = subprocess.check_output("sc.exe query state= all", shell=True, text=True)
-        service_name = None
-        for line in output.splitlines():
-            line = line.strip()
-            if line.startswith("SERVICE_NAME:"):
-                service_name = line.partition(":")[2].strip()
-            elif line.startswith("STATE") and service_name:
-                parts = line.partition(":")[2].strip().split(None, 1)
-                if len(parts) == 2:
-                    raw_state = parts[1].strip()
-                    # Dummy values for unsupported metadata on Windows
-                    services.append((service_name, raw_state, "unknown", "unknown", "unknown", True))
-                service_name = None
-    except Exception as exc:
-        print(f"[ERROR] Windows service query failed: {exc}")
-    return services
-
-def collect_linux_services():
-    services = []
-    try:
-        unit_rows = subprocess.check_output(
-            "systemctl list-unit-files --type=service --no-legend --no-pager",
-            shell=True, text=True
-        ).splitlines()
-
-        for row in unit_rows:
-            row = row.strip()
-            if not row:
-                continue
-            svc_name = row.split()[0]
-            if svc_name.endswith("@.service"):
-                continue
-
-            res = subprocess.run([
-                "systemctl", "show", svc_name,
-                "--property=ActiveState,SubState,Type,UnitFileState"
-            ], capture_output=True, text=True)
-
-            if res.returncode != 0:
-                warn = (res.stderr or res.stdout).strip()
-                print(f"[WARN] Could not query {svc_name}: {warn}")
-                continue
-
-            parsed = dict(
-                (key.strip(), value.strip())
-                for line in res.stdout.strip().splitlines() if "=" in line
-                for key, value in [line.split("=", 1)]
-            )
-
-            active_state = parsed.get("ActiveState", "unknown")
-            sub_state = parsed.get("SubState", "unknown")
-            service_type = parsed.get("Type", "unknown")
-            unit_file_state = parsed.get("UnitFileState", "unknown")
-
-            recoverable = (
-                service_type not in ["oneshot", "notify"] and
-                unit_file_state not in ["static", "masked"]
-            )
-
-            services.append((svc_name, active_state, sub_state, service_type, unit_file_state, recoverable))
-    except Exception as exc:
-        print(f"[ERROR] Linux service collection failed: {exc}")
-    return services
-
-def collect_service_status():
-    os_platform = platform.system()
-    hostname = socket.gethostname()
-
-    if os_platform == "Windows":
-        collected = collect_windows_services()
-    else:
-        collected = collect_linux_services()
-
-    rows = []
-    for svc_name, active_state, sub_state, service_type, unit_file_state, recoverable in collected:
-        rows.append({
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-            "hostname": hostname,
-            "os_platform": os_platform,
-            "service_name": svc_name,
-            "raw_status": active_state.lower(),
-            "normalized_status": normalize_service_status(os_platform, active_state),
-            "sub_state": sub_state,
-            "service_type": service_type,
-            "unit_file_state": unit_file_state,
-            "recoverable": 1 if recoverable else 0
-        })
-    return rows
-
-def handle_service_monitor():
-    batch = collect_service_status()
-    if batch:
-        log_service_status_batch(batch)
-        print(f"[INFO] Logged {len(batch)} service rows → DB; sleeping 60s...")
-    else:
-        print("[INFO] No services collected this cycle; sleeping 60s...")
-
-if __name__ == "__main__":
-    print("[INFO] Service Monitor starting …")
-    try:
-        while True:
-            handle_service_monitor()
-            time.sleep(60)
-    except KeyboardInterrupt:
-        print("[INFO] Service Monitor stopped by user.")
+#
+# def handle_service_monitor():
+#     batch = collect_service_status()
+#     if batch:
+#         log_service_status_batch(batch)
+#         print(f"[INFO] Logged {len(batch)} service rows → DB; sleeping 60s...")
+#     else:
+#         print("[INFO] No services collected this cycle; sleeping 60s...")
+#
+# if __name__ == "__main__":
+#     print("[INFO] Service Monitor starting …")
+#     try:
+#         while True:
+#             handle_service_monitor()
+#             time.sleep(60)
+#     except KeyboardInterrupt:
+#         print("[INFO] Service Monitor stopped by user.")
 
 
 
