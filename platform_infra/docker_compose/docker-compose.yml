@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ---------- shared defaults ----------
 x-env-common: &env_common
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
