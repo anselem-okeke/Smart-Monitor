@@ -142,16 +142,16 @@ def collect_linux_services():
       - SERVICE_STATUS_MODE=cmd      → use shim (busctl) inside container
       - SERVICE_STATUS_MODE=systemd  → use systemctl (fallback)
     """
+    services = []
+
     mode = os.getenv("SERVICE_STATUS_MODE", "systemd").lower()
     watch_env = os.getenv("SMARTMON_SERVICE_WATCH", "")
     watch_list = [w.strip() for w in watch_env.split(",") if w.strip()]
-    services = []
 
-    # Decide unit list (respect manual watch list first)
-    if watch_list:
-        units = watch_list
-    else:
-        units = _linux_list_units_cmd() if mode == "cmd" else _linux_list_units_systemctl()
+    # units to check (from shim/systemctl unless explicit watch)
+    units = watch_list if watch_list else (
+        _linux_list_units_cmd() if mode == "cmd" else _linux_list_units_systemctl()
+    )
 
     for svc_name in units:
         try:
@@ -159,19 +159,22 @@ def collect_linux_services():
                 active, sub_state, service_type, unit_file_state = _linux_show_via_cmd(svc_name)
             else:
                 info = _linux_show_via_systemctl(svc_name)
-                active         = info["ActiveState"]
-                sub_state      = info["SubState"]
-                service_type   = info["Type"]
-                unit_file_state= info["UnitFileState"]
+                active = info["ActiveState"]
+                sub_state = info["SubState"]
+                service_type = info["Type"]
+                unit_file_state = info["UnitFileState"]
+
+            # Hard filter: if shim couldn’t resolve it, drop it unless the user asked for it explicitly
+            if not watch_list and (active == "unknown" and sub_state == "unknown"):
+                continue
 
             recoverable = (
-                (service_type or "unknown") not in ("oneshot", "notify") and
-                (unit_file_state or "unknown") not in ("static", "masked")
+                    (service_type or "unknown") not in ("oneshot", "notify") and
+                    (unit_file_state or "unknown") not in ("static", "masked")
             )
             services.append((svc_name, active, sub_state, service_type, unit_file_state, recoverable))
         except Exception as exc:
             print(f"[WARN] Could not query {svc_name}: {exc}")
-    return services
 
 # ---------- main flow ----------
 

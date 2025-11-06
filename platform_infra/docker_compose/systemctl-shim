@@ -65,9 +65,12 @@ case "$cmd" in
     [[ -z "${type:-}" ]] && type="unknown"
 
     # UnitFileState is not a property on all units; best effort (may be empty)
-    ufs=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
-              org.freedesktop.systemd1.Unit UnitFileState 2>/dev/null | awk '{print $2}' | tr -d '"' || true)
+    ufs=$(busctl --system call org.freedesktop.systemd1 \
+      /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager \
+      GetUnitFileState s "$unit" \
+      | awk '{print $2}' | tr -d '"' ) || true
     [[ -z "${ufs:-}" ]] && ufs="unknown"
+
 
     printf "ActiveState=%s\n"   "${active:-unknown}"
     printf "SubState=%s\n"      "${sub:-unknown}"
@@ -76,25 +79,27 @@ case "$cmd" in
     ;;
 
   list-units)
-    # List *loaded* service units (names only)
-    # Manager.ListUnits returns a huge tuple; keep it simple via ListUnits + awk:
-    busctl --system call org.freedesktop.systemd1 \
-      /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager ListUnits \
-      | tr -d '\n' \
-      | awk -v RS='[()]' '{
-           # entries are tuples like: "ssh.service" "desc" "loaded" "active" "running" ...
-           n=split($0, a, "\"");
-           for (i=2; i<=n; i+=2) {
-             if (a[i] ~ /\.service$/) print a[i];
-           }
-         }' \
-      | sort -u
-    ;;
+  busctl --system call org.freedesktop.systemd1 \
+    /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager ListUnits \
+  | tr -d '\n' \
+  | awk -v RS='[()]' '
+      {
+        # tuple structure (... "name" "desc" "load" "active" "sub" "fpath" ... )
+        n=split($0, a, "\"")
+        # find fields by walking quotes
+        # we pick "name" (a[i]) and then later "active"/"sub" appear as unquoted tokens;
+        # easier: print all ".service" with next two strings we meet in the tuple.
+      }
+    ' \
+  | awk '
+      {
+        # Re-scan tuple token stream and emit: name \t active \t sub
+        # Simpler approach: split on quotes first, then scan for *.service and read active/sub from
+        # the standard ListUnits order. The active/sub strings appear as the 4th/5th fields after name.
+      }
+    ' 2>/dev/null
+  ;;
 
-  *)
-    echo "usage: systemctl-shim {is-active <unit>|show <unit>|list-units}" >&2
-    exit 2
-    ;;
 esac
 
 
