@@ -5,7 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="13852bf5-efb7-4174-a74c-642c81305c61" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" afterDir="false" />
     </list>

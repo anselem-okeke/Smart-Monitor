@@ -157,6 +157,9 @@ def collect_linux_services():
         try:
             if mode == "cmd":
                 active, sub_state, service_type, unit_file_state = _linux_show_via_cmd(svc_name)
+                if active == "unknown" and sub_state == "unknown":
+                    # likely not loaded / not a real unit
+                    continue
             else:
                 info = _linux_show_via_systemctl(svc_name)
                 active = info["ActiveState"]
@@ -175,6 +178,7 @@ def collect_linux_services():
             services.append((svc_name, active, sub_state, service_type, unit_file_state, recoverable))
         except Exception as exc:
             print(f"[WARN] Could not query {svc_name}: {exc}")
+    return services
 
 # ---------- main flow ----------
 

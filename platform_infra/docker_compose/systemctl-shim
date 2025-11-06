@@ -55,6 +55,11 @@ case "$cmd" in
       exit 0
     }
 
+    load=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+        org.freedesktop.systemd1.Unit LoadState | awk '{print $2}' | tr -d '"')
+    printf "LoadState=%s\n" "${load:-unknown}"
+
+
     active=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
               org.freedesktop.systemd1.Unit ActiveState | awk '{print $2}' | tr -d '"')
     sub=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
