@@ -36,7 +36,7 @@ def normalize_service_status(os_platform: str, raw_status: str) -> str:
 def _linux_list_units_systemctl():
     """Fallback listing via systemctl (container often lies)."""
     out = subprocess.check_output(
-        ["bash", "-lc", "systemctl list-unit-files --type=service --no-legend --no-pager"],
+        ["bash", "-lc", "systemctl list-units --type=service --all --no-legend --no-pager"],
         text=True
     )
     units = []
