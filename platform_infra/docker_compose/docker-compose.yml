@@ -25,11 +25,13 @@ services:
   postgres:
     image: postgres:15
     container_name: sm-postgres
+    ports:
+      - "${HOST_IP}:${HOST_PORT}:5432"
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME:-smartdb}
-      POSTGRES_USER: ${DB_USER:-smart}
-      POSTGRES_PASSWORD: ${DB_PASS:-smartpass}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-smart} -d ${DB_NAME:-smartdb} -h 127.0.0.1"]
       interval: 5s
@@ -65,12 +67,12 @@ services:
     depends_on:
       - gui
     ports:
-      - "${HTTP_PORT:-80}:80"
+      - "${HTTP_PORT}:80"
+      - "${HTTPS_PORT}:443"
     volumes:
       - ${NGINX_SITE_CONF:?point to site.conf}:/etc/nginx/conf.d/default.conf:ro
-      # optional TLS (if terminating locally)
-      # - ${TLS_FULLCHAIN:-/etc/letsencrypt/live/yourhost/fullchain.pem}:/etc/nginx/tls/fullchain.pem:ro
-      # - ${TLS_PRIVKEY:-/etc/letsencrypt/live/yourhost/privkey.pem}:/etc/nginx/tls/privkey.pem:ro
+      - ${TLS_FULLCHAIN:-/etc/letsencrypt/live/host/fullchain.pem}:/etc/nginx/tls/fullchain.pem:ro
+      - ${TLS_PRIVKEY:-/etc/letsencrypt/live/host/privkey.pem}:/etc/nginx/tls/privkey.pem:ro
     networks: [smartnet]
 
   # ---------- Cloudflared (optional, use when not exposing 80/443) ----------
@@ -78,9 +80,9 @@ services:
     image: cloudflare/cloudflared:2024.10.0
     container_name: sm-cloudflared
     restart: unless-stopped
-    command: tunnel --config /etc/cloudflared/config.yml run
-    volumes:
-      - /etc/cloudflared:/etc/cloudflared:ro
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TRANSPORT_PROTOCOL=quic
     depends_on:
       - nginx
     networks:
@@ -155,6 +157,7 @@ services:
       SMARTMON_API_KEY: ${SMARTMON_API_KEY:?set in .env}
       PROCFS_ROOT: /host/proc
       SYSFS_ROOT: /host/sys
+      #SMARTMON_SERVICE_WATCH: ${SMARTMON_SERVICE_WATCH}
       SERVICE_STATUS_MODE: cmd
       SERVICE_STATUS_CMD: /usr/local/bin/systemctl-shim
       SMARTCTL: /usr/sbin/smartctl
@@ -170,7 +173,7 @@ services:
       - /dev:/dev                            # SMART device access
       - /etc/machine-id:/etc/machine-id:ro
       - ${APPROVED_JSON_HOST}:/app/config/approved_services.json:ro
-      - /vagrant/Smart-Monitor/platform_infra/docker_compose/systemctl-shim:/usr/local/bin/systemctl-shim:ro
+      #- /vagrant/Smart-Monitor/platform_infra/docker_compose/systemctl-shim:/usr/local/bin/systemctl-shim:ro
     healthcheck:
       test: ["CMD", "python3", "/app/healthcheck.py"]
       interval: 30s

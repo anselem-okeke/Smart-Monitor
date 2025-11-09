@@ -11,4 +11,4 @@ PROJECT_URL     = os.getenv("SMARTMON_PROJECT_URL", "https://github.com/anselem-
 OWNER_URL       = os.getenv("SMARTMON_OWNER_URL", "https://www.linkedin.com/in/anselem-okeke/")
 FLASK_URL       = os.getenv("FLASK_URL", "https://flask.palletsprojects.com")
 SQLITE_URL      = os.getenv("SQLITE_URL", "https://www.sqlite.org")
-
+POSTGRES_URL    = os.getenv("POSTGRES_URL", "https://www.postgresql.org/docs/")

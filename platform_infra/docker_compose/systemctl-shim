@@ -1,28 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cmd="${1:-}"; arg="${2:-}"
 
-# Minimal systemctl-compatible shim that talks to host systemd via busctl.
-# Implements:
-#   - systemctl is-active <unit>
-#   - systemctl show <unit>                 (ActiveState/SubState/Type/UnitFileState)
-#   - systemctl list-units                  (prints one *.service per line)
-#
-# Requirements inside the container:
-#   - DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
-#   - Mount /run/dbus/system_bus_socket and /run/systemd
-#   - busctl available (from systemd package)
-#
-# TIP: We'll query both "Service" and "Unit" interfaces where appropriate.
-
-cmd="${1:-}"
-arg="${2:-}"
-
-# Normalize unit name (nginx → nginx.service)
 normalize_unit() {
   local u="$1"
-  if [[ -n "$u" && "$u" != *.service ]]; then
-    u="${u}.service"
-  fi
+  [[ -n "$u" && "$u" != *.service ]] && u="${u}.service"
   printf '%s\n' "$u"
 }
 
@@ -35,8 +17,18 @@ get_unit_path() {
     echo ""
     return 1
   fi
-  # Output format: o "/org/freedesktop/systemd1/unit/ssh_2eservice"
   echo "$out" | awk -F'"' '{print $2}'
+}
+
+emit_service_name_if_ok() {
+  # args: name load active sub following fields ignored here
+  local name="$1" load="$2" active="$3" sub="$4"
+  # Filter junk: templates, timers/paths/slices/scopes
+  [[ "$name" != *.service ]] && return 0
+  [[ "$name" == *@.service ]] && return 0
+  [[ "$name" =~ \.(timer|path|slice|scope)$ ]] && return 0
+  # We’ll keep running/failed/activating etc.; 'static' gets filtered in show/Type if needed
+  printf '%s\n' "$name"
 }
 
 case "$cmd" in
@@ -51,61 +43,119 @@ case "$cmd" in
   show)
     unit="$(normalize_unit "$arg")"
     path="$(get_unit_path "$unit")" || {
-      printf "ActiveState=unknown\nSubState=unknown\nType=unknown\nUnitFileState=unknown\n"
+      printf "ActiveState=unknown\nSubState=unknown\nType=unknown\nUnitFileState=unknown\nLoadState=unknown\n"
       exit 0
     }
-
     load=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
-        org.freedesktop.systemd1.Unit LoadState | awk '{print $2}' | tr -d '"')
-    printf "LoadState=%s\n" "${load:-unknown}"
-
-
+              org.freedesktop.systemd1.Unit LoadState | awk '{print $2}' | tr -d '"')
     active=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
               org.freedesktop.systemd1.Unit ActiveState | awk '{print $2}' | tr -d '"')
     sub=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
               org.freedesktop.systemd1.Unit SubState | awk '{print $2}' | tr -d '"')
-    # Try Service.Type first, fall back to UnitType-less units
     type=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
               org.freedesktop.systemd1.Service Type 2>/dev/null | awk '{print $2}' | tr -d '"' || true)
     [[ -z "${type:-}" ]] && type="unknown"
-
-    # UnitFileState is not a property on all units; best effort (may be empty)
+    # UnitFileState via Manager.GetUnitFileState (works even if property missing)
     ufs=$(busctl --system call org.freedesktop.systemd1 \
-      /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager \
-      GetUnitFileState s "$unit" \
-      | awk '{print $2}' | tr -d '"' ) || true
+            /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager \
+            GetUnitFileState s "$(basename "$unit")" | awk '{print $2}' | tr -d '"' || true)
     [[ -z "${ufs:-}" ]] && ufs="unknown"
-
-
-    printf "ActiveState=%s\n"   "${active:-unknown}"
-    printf "SubState=%s\n"      "${sub:-unknown}"
-    printf "Type=%s\n"          "${type:-unknown}"
-    printf "UnitFileState=%s\n" "${ufs:-unknown}"
+    printf "ActiveState=%s\nSubState=%s\nType=%s\nUnitFileState=%s\nLoadState=%s\n" \
+           "${active:-unknown}" "${sub:-unknown}" "${type:-unknown}" "${ufs:-unknown}" "${load:-unknown}"
     ;;
 
   list-units)
-  busctl --system call org.freedesktop.systemd1 \
-    /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager ListUnits \
-  | tr -d '\n' \
-  | awk -v RS='[()]' '
-      {
-        # tuple structure (... "name" "desc" "load" "active" "sub" "fpath" ... )
-        n=split($0, a, "\"")
-        # find fields by walking quotes
-        # we pick "name" (a[i]) and then later "active"/"sub" appear as unquoted tokens;
-        # easier: print all ".service" with next two strings we meet in the tuple.
-      }
-    ' \
-  | awk '
-      {
-        # Re-scan tuple token stream and emit: name \t active \t sub
-        # Simpler approach: split on quotes first, then scan for *.service and read active/sub from
-        # the standard ListUnits order. The active/sub strings appear as the 4th/5th fields after name.
-      }
-    ' 2>/dev/null
-  ;;
+    # Emit union: running + failed (names only)
+    # Manager.ListUnits returns an array of structures. We’ll parse with busctl --verbose-friendly format.
+    busctl --system call org.freedesktop.systemd1 /org/freedesktop/systemd1 \
+      org.freedesktop.systemd1.Manager ListUnits \
+      | tr -d '\n' \
+      | awk -F'[()"]' '
+          {
+            for (i=1; i<=NF; i++) {
+              if ($i ~ /\.service$/) {
+                name=$i
+                # The next fields (outside quotes) contain load/active/sub later in the tuple; hard to align reliably.
+                # We will simply print the name here; filters happen in collector via show().
+                print name
+              }
+            }
+          }
+        ' \
+      | awk '!seen[$0]++'
+    ;;
 
+  list-units-clean)
+    # Optional cleaner: only running/failed via two filtered queries
+    # Running:
+    busctl --system call org.freedesktop.systemd1 /org/freedesktop/systemd1 \
+      org.freedesktop.systemd1.Manager ListUnits \
+      | tr -d '\n' \
+      | awk -F'[()"]' '
+          { for (i=1; i<=NF; i++) if ($i ~ /\.service$/) { print $i } }
+        ' \
+      | awk '!seen[$0]++' \
+      | while read -r n; do
+          # Filter timers/templates/etc.
+          [[ "$n" != *.service ]] && continue
+          [[ "$n" == *@.service ]] && continue
+          [[ "$n" =~ \.(timer|path|slice|scope)$ ]] && continue
+          echo "$n"
+        done
+    ;;
+
+  list-unit-files-enabled)
+    # List enabled unit files (to catch stopped-but-should-run)
+    busctl --system call org.freedesktop.systemd1 /org/freedesktop/systemd1 \
+      org.freedesktop.systemd1.Manager ListUnitFiles \
+      | tr -d '\n' \
+      | awk -F'[()"]' '
+          {
+            for (i=1; i<=NF; i++) {
+              if ($i ~ /\.service$/) {
+                name=$i
+                # The state appears later in tuple; do a second pass:
+                # For simplicity, we print all *.service here; the collector filters by UnitFileState=enabled via show()
+                print name
+              }
+            }
+          }
+        ' \
+      | awk '!seen[$0]++'
+    ;;
+
+  *)
+    echo "usage: $0 {is-active|show|list-units|list-units-clean|list-unit-files-enabled} [unit]" >&2
+    exit 2
+    ;;
 esac
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -150,78 +200,106 @@ esac
 #set -euo pipefail
 #
 ## Minimal systemctl-compatible shim that talks to host systemd via busctl.
-## It implements:
+## Implements:
 ##   - systemctl is-active <unit>
-##   - systemctl is-enabled <unit>   (best-effort)
-##   - systemctl show <unit>         (prints the 4 fields your parser needs)
+##   - systemctl show <unit>                 (ActiveState/SubState/Type/UnitFileState)
+##   - systemctl list-units                  (prints one *.service per line)
+##
+## Requirements inside the container:
+##   - DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
+##   - Mount /run/dbus/system_bus_socket and /run/systemd
+##   - busctl available (from systemd package)
+#
 #
 #cmd="${1:-}"
-#unit="${2:-}"
+#arg="${2:-}"
 #
-## Map typical shortcuts (nginx -> nginx.service)
-#if [[ "${unit:-}" != *.service && -n "${unit:-}" ]]; then
-#  unit="${unit}.service"
-#fi
+## Normalize unit name (nginx → nginx.service)
+#normalize_unit() {
+#  local u="$1"
+#  if [[ -n "$u" && "$u" != *.service ]]; then
+#    u="${u}.service"
+#  fi
+#  printf '%s\n' "$u"
+#}
 #
 #get_unit_path() {
-#  local u="$1"
-#  # Ask systemd to resolve the unit name to an object path
+#  local unit="$1"
 #  local out
 #  if ! out=$(busctl --system call org.freedesktop.systemd1 \
-#      /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager \
-#      GetUnit s "$u" 2>/dev/null); then
+#        /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager \
+#        GetUnit s "$unit" 2>/dev/null); then
 #    echo ""
 #    return 1
 #  fi
-#  # Output looks like: o "/org/freedesktop/systemd1/unit/ssh_2eservice"
+#  # Output format: o "/org/freedesktop/systemd1/unit/ssh_2eservice"
 #  echo "$out" | awk -F'"' '{print $2}'
 #}
 #
 #case "$cmd" in
 #  is-active)
-#    path=$(get_unit_path "$unit") || { echo "unknown"; exit 0; }
-#    # ActiveState
+#    unit="$(normalize_unit "$arg")"
+#    path="$(get_unit_path "$unit")" || { echo "unknown"; exit 0; }
 #    state=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
-#            org.freedesktop.systemd1.Unit ActiveState | awk '{print $2}' | tr -d '"')
+#              org.freedesktop.systemd1.Unit ActiveState | awk '{print $2}' | tr -d '"')
 #    echo "${state:-unknown}"
 #    ;;
 #
-#  is-enabled)
-#    # UnitFileState is on the UnitFile interface if present; fall back to unknown
-#    path=$(get_unit_path "$unit") || { echo "unknown"; exit 0; }
-#    uf=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
-#          org.freedesktop.systemd1.UnitFileState UnitFileState 2>/dev/null \
-#          | awk '{print $2}' | tr -d '"' ) || true
-#    echo "${uf:-unknown}"
-#    ;;
-#
 #  show)
-#    path=$(get_unit_path "$unit") || {
-#      # Print the four fields with 'unknown' so your parser still sees keys
+#    unit="$(normalize_unit "$arg")"
+#    path="$(get_unit_path "$unit")" || {
 #      printf "ActiveState=unknown\nSubState=unknown\nType=unknown\nUnitFileState=unknown\n"
 #      exit 0
 #    }
+#
+#    load=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
+#        org.freedesktop.systemd1.Unit LoadState | awk '{print $2}' | tr -d '"')
+#    printf "LoadState=%s\n" "${load:-unknown}"
+#
 #
 #    active=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
 #              org.freedesktop.systemd1.Unit ActiveState | awk '{print $2}' | tr -d '"')
 #    sub=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
 #              org.freedesktop.systemd1.Unit SubState | awk '{print $2}' | tr -d '"')
+#    # Try Service.Type first, fall back to UnitType-less units
 #    type=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
-#              org.freedesktop.systemd1.Service Type 2>/dev/null | awk '{print $2}' | tr -d '"' )
-#    # UnitFileState isn’t on every unit; best-effort:
-#    uf=$(busctl --system get-property org.freedesktop.systemd1 "$path" \
-#            org.freedesktop.systemd1.UnitFileState UnitFileState 2>/dev/null \
-#            | awk '{print $2}' | tr -d '"' ) || true
+#              org.freedesktop.systemd1.Service Type 2>/dev/null | awk '{print $2}' | tr -d '"' || true)
+#    [[ -z "${type:-}" ]] && type="unknown"
 #
-#    printf "ActiveState=%s\n" "${active:-unknown}"
-#    printf "SubState=%s\n"     "${sub:-unknown}"
-#    printf "Type=%s\n"         "${type:-unknown}"
-#    printf "UnitFileState=%s\n" "${uf:-unknown}"
+#    # UnitFileState is not a property on all units; best effort (may be empty)
+#    ufs=$(busctl --system call org.freedesktop.systemd1 \
+#      /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager \
+#      GetUnitFileState s "$unit" \
+#      | awk '{print $2}' | tr -d '"' ) || true
+#    [[ -z "${ufs:-}" ]] && ufs="unknown"
+#
+#
+#    printf "ActiveState=%s\n"   "${active:-unknown}"
+#    printf "SubState=%s\n"      "${sub:-unknown}"
+#    printf "Type=%s\n"          "${type:-unknown}"
+#    printf "UnitFileState=%s\n" "${ufs:-unknown}"
 #    ;;
 #
-#  *)
-#    echo "usage: systemctl-shim {is-active|is-enabled|show} <unit>" >&2
-#    exit 2
-#    ;;
+#  list-units)
+#  busctl --system call org.freedesktop.systemd1 \
+#    /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager ListUnits \
+#  | tr -d '\n' \
+#  | awk -v RS='[()]' '
+#      {
+#        # tuple structure (... "name" "desc" "load" "active" "sub" "fpath" ... )
+#        n=split($0, a, "\"")
+#        # find fields by walking quotes
+#        # we pick "name" (a[i]) and then later "active"/"sub" appear as unquoted tokens;
+#        # easier: print all ".service" with next two strings we meet in the tuple.
+#      }
+#    ' \
+#  | awk '
+#      {
+#        # Re-scan tuple token stream and emit: name \t active \t sub
+#        # Simpler approach: split on quotes first, then scan for *.service and read active/sub from
+#        # the standard ListUnits order. The active/sub strings appear as the 4th/5th fields after name.
+#      }
+#    ' 2>/dev/null
+#  ;;
+#
 #esac
-#

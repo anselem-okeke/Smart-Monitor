@@ -5,13 +5,13 @@ param(
     [string]$AppPath     = "Z:\DevOps\section8_vprofile_project_manual_automation\vprofile-project\vagrant\Manual_provisioning_WinMacIntel\Smart-Monitor\main.py",
     [string]$AppDir      = "Z:\DevOps\section8_vprofile_project_manual_automation\vprofile-project\vagrant\Manual_provisioning_WinMacIntel\Smart-Monitor",
     [string]$DataDir     = "C:\ProgramData\SmartMonitor",
-    # >>> add this: IP or DNS name of the Linux Postgres VM
+    # IP or DNS name of the Linux Postgres VM
     [string]$DbHost      = "192.168.56.11",
     # optional: DB creds / name (must match what you created on the VM)
     [string]$DbName      = "smartdb",
     [string]$DbUser      = "smart",
     [string]$DbPass      = "smartpass",
-    [int]$DbPort         = 5432
+    [int]$DbPort         = 5438
 )
 
 # Ensure NSSM is installed

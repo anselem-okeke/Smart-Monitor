@@ -57,6 +57,9 @@ COPY platform_infra/docker/entrypoint.ps1 /app/entrypoint.ps1
 COPY platform_infra/docker/healthcheck.py /app/healthcheck.py
 RUN chmod +x /app/entrypoint.sh || true
 
+COPY platform_infra/docker_compose/systemctl-shim /usr/local/bin/systemctl-shim
+RUN chmod +x /usr/local/bin/systemctl-shim
+
 FROM base AS linux
 ARG OS=linux
 RUN echo "[BUILD] Linux Orchestrator" && \
