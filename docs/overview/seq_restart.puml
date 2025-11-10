@@ -1,0 +1,39 @@
+@startuml Seq_Service_Restart
+title Self-Healing: Restart Failed Service
+
+participant "Orchestrator\n(sm-orchestrator-lab)" as AG
+participant "Flask API\n(sm-gui)" as API
+database  "PostgreSQL\n(sm-postgres)" as DB
+participant "systemd\n(D-Bus)" as SYS
+participant "Nginx\n(sm-nginx)" as NGINX
+actor       "Browser\nDashboard" as UI
+
+== Sense & Ingest ==
+AG -> SYS : is-active nginx.service (failed)
+SYS --> AG : ActiveState=failed
+AG -> API : POST /api/ingest/service-status\n{svc: nginx.service, raw: failed}
+API -> DB : INSERT service_status
+DB --> API : ack
+API --> AG : 202
+
+== Classify & Decide ==
+API -> DB : fetch recent history
+DB --> API : rows
+API -> API : classify = FAILED\npolicy = restart allowed
+API -> DB : INSERT decision(audit)
+
+== Act ==
+API -> AG : action: restart nginx.service
+AG -> SYS : systemctl restart nginx.service
+SYS --> AG : exit=0
+AG -> SYS : is-active nginx.service
+SYS --> AG : ActiveState=active
+
+== Audit & Stream ==
+AG -> API : POST /api/ingest/actions\n{outcome: success}
+API -> DB : INSERT action + outcome
+API -> NGINX : SSE push (incident resolved)
+NGINX -> UI : event: {svc, action:restart, ok:true}
+
+@enduml
+

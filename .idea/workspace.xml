@@ -5,17 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="13852bf5-efb7-4174-a74c-642c81305c61" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.github/workflows/build-push-gui.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/build-push-gui.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gui/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gui/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gui/templates/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/gui/templates/base.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker/orchestrator.linux.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/orchestrator.linux.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/service_setup/window/install_service2.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/service_setup/window/install_service2.ps1" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -1,0 +1,135 @@
+@startuml SmartMonitor_Lab_Sequence
+title Smart-Monitor (Lab) — Closed-Loop Self-Healing Flow
+
+
+
+' ---------- Participants (compose service names in <<stereotype>>) ----------
+participant "Orchestrator/Agent\n<<sm-orchestrator-lab>>" as AG
+participant "systemd (D-Bus)\n/mnt /run/dbus" as SYS
+participant "Flask API (Gunicorn)\n<<sm-gui>>" as API
+participant "PostgreSQL\n<<sm-postgres>>" as DB
+participant "Classifier Engine\n(heuristics/baselines)" as CLF
+participant "Policy & Safety Layer\n(allow-list, cooldowns, windows)" as POL
+participant "Remediator\n(actions, backoff, verify)" as ACT
+participant "Nginx (TLS/SSE)\n<<sm-nginx>>" as NGINX
+participant "Cloudflared (opt)\n<<sm-cloudflared>>" as CF
+actor       "Engineer Browser\n(SSE dashboard)" as UI
+participant "Host Helper (opt)\nroot-priv API" as HH
+
+' ---------- Legend ----------
+hnote over AG,UI
+Smart-Monitor LAB stack (docker-compose):
+- sm-orchestrator-lab (privileged)
+- sm-gui (Flask/Gunicorn API)
+- sm-postgres (state + audit)
+- sm-nginx (TLS + SSE)
+- sm-cloudflared (optional)
+end note
+
+' ---------- 1) Sense: collect host/service state ----------
+AG -> SYS : Query service states via D-Bus\n(is-active, show SubState/Type/UnitFileState)\n+ read /proc,/sys (CPU, mem, disk IO)
+note right of AG
+Normalize raw states → {running|stopped|failed|unknown}\nBuild metrics & events batch
+end note
+
+' ---------- 2) Ingest → DB ----------
+AG -> API : POST /api/ingest/service-status\n& /api/ingest/metrics\n(payload: host, svc, raw, normalized, ts, dims)
+API -> DB : INSERT metrics/events rows\n(services, processes, disks, net, smartctl)
+DB --> API : ack
+API --> AG : 202 Accepted
+
+' ---------- 3) Think: classify new events ----------
+API -> CLF : notifyNewBatch(events)
+activate CLF
+CLF -> DB : Read recent window (Δt) for correlation
+CLF <-- DB : timeseries + service history
+CLF -> CLF : Heuristics + baselines + state machine\n• failed + retry_exceeded → INCIDENT\n• CPU z-score>k + OOM + service down → MEMORY_PRESSURE\n• flapping(rate) > threshold → FLAPPING
+CLF -> DB : INSERT classifications(labels, confidence)
+deactivate CLF
+
+' ---------- 4) Decide: policy & safety ----------
+API -> POL : evaluate(decisionRequest)\n(labels, service, host, cooldown, window)
+activate POL
+POL -> DB : read policy (approved_services.json snapshot) & cooldowns\n+ last actions for this svc
+POL <-- DB : policy rows
+alt Allowed by policy
+  POL --> API : APPROVED(actionSpec, guardrails)\n(max_retries, backoff, timeout)
+else Denied or Dry-Run
+  POL --> API : DENIED(reason) or DRY_RUN\n(log only)
+end
+deactivate POL
+
+' ---------- 5) Act: remediation path ----------
+alt APPROVED
+  API -> ACT : execute(actionSpec)
+  activate ACT
+  opt Lab (privileged agent executes locally)
+    ACT -> AG : requestRemediation(service:restart)
+    AG -> SYS : systemctl restart <svc>
+    SYS --> AG : result(exit code, SubState)
+  end
+  opt Hardened host (optional helper)
+    ACT -> HH : POST /actions/restart?svc=<svc>\n(Authorization: API key)
+    HH -> SYS : systemctl restart <svc>
+    SYS --> HH : result
+    HH --> ACT : result
+  end
+  ACT -> SYS : verify health (is-active) after backoff
+  SYS --> ACT : ActiveState=active?
+  ACT -> DB : INSERT actions(audit), outcomes, duration
+  deactivate ACT
+else DENIED/DRY_RUN
+  API -> DB : INSERT decision audit (no-op)
+end
+
+' ---------- 6) Live updates to UI via SSE ----------
+par Live stream (SSE)
+  API -> NGINX : push events → /api/stream/alerts (SSE)
+  NGINX -> UI : event: classification/action\n{id, svc, label, decision, outcome}
+end
+
+' ---------- 7) Optional public egress via Cloudflared ----------
+opt Public egress (optional)
+  UI -> CF : https://<tunnel-host>/ … 
+  CF -> NGINX : proxied HTTPS (QUIC)
+  NGINX -> API : upstream to Flask
+end
+
+' ---------- 8) Post-conditions & learning ----------
+API -> DB : UPDATE incident status\n(resolved, MTTR, attempt_count)
+DB --> API : ack
+note over DB
+Everything persisted for audit:\nmetrics, service states, classifications,\npolicy decisions, actions, outcomes.
+end note
+
+' ---------- 9) Failure handling / circuit breaker ----------
+group If remediation fails repeatedly
+  ACT -> ACT : exponential backoff + jitter
+  ACT -> POL : circuitBreaker.trip?(svc)
+  POL --> ACT : trip if attempts > limit in window
+  ACT -> DB : log escalation + stop automated actions
+  API -> UI : SSE event: escalation_required
+end
+
+' ---------- 10) Manual follow-up ----------
+UI -> API : POST /api/acknowledge or /api/runbook-link
+API -> DB : record user ack / note / runbook ref
+
+' ---------- End ----------
+hnote over UI
+Dashboard panes:
+• Current service health & labels
+• Recent incidents and actions
+• SSE live ticker
+• Audit trail & MTTR trends
+end note
+
+@enduml
+
+
+
+
+
+
+
+

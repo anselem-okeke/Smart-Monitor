@@ -1,0 +1,40 @@
+@startuml Seq_Network_Remediation
+title Self-Healing: Network Degradation → DNS Flush / Service Restart
+
+participant "Orchestrator" as AG
+participant "Flask API" as API
+database  "PostgreSQL" as DB
+participant "systemd\n(D-Bus)" as SYS
+participant "Nginx" as NGINX
+actor       "Browser" as UI
+
+== Detect ==
+AG -> AG : ping/traceroute targets\nloss > 40% OR name resolve failures
+AG -> API : POST /api/ingest/network\n{loss, rtt, dns_errors}
+API -> DB : INSERT network_event
+
+== Classify ==
+API -> API : classify=NETWORK_DEGRADED
+API -> DB : INSERT classification
+
+== Policy ==
+API -> DB : read policy (network recovery)\n{actions: resolv flush → systemd-resolved restart}
+DB --> API : rules + cooldown
+API -> API : decision=execute
+
+== Act ==
+API -> AG : flush DNS cache\nrestart systemd-resolved
+AG -> SYS : resolvectl flush-caches
+SYS --> AG : ok
+AG -> SYS : systemctl restart systemd-resolved
+SYS --> AG : ok
+AG -> AG : verify ping success
+
+== Audit & Stream ==
+AG -> API : POST /api/ingest/actions\n{type:net_recover, ok:true}
+API -> DB : INSERT action/outcome
+API -> NGINX : SSE push
+NGINX -> UI : event payload
+
+@enduml
+

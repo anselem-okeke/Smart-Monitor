@@ -1,0 +1,39 @@
+@startuml Seq_Memory_Pressure_Kill
+title Self-Healing: Memory Pressure → Kill Runaway
+
+participant "Orchestrator" as AG
+participant "Flask API" as API
+database  "PostgreSQL" as DB
+participant "systemd\n(D-Bus)" as SYS
+participant "Nginx" as NGINX
+actor       "Browser" as UI
+
+== Detect ==
+AG -> AG : read /proc + cgroup stats\nmem% > threshold, offenders=python3(2.3GB)
+AG -> API : POST /api/ingest/metrics\n{mem%, offenders:[...]}
+API -> DB : INSERT metrics
+
+== Classify ==
+API -> DB : window(ts) for host
+DB --> API : series
+API -> API : classify=MEMORY_PRESSURE
+API -> DB : INSERT classification
+
+== Policy ==
+API -> DB : load policy (kill_whitelist)\n& cooldowns
+DB --> API : {python3 allowed}
+API -> API : decision=KILL_TOP offenders\nmax_retries=3 backoff=10s
+
+== Act ==
+API -> AG : kill PIDs [1234, 1277]
+AG -> AG : SIGTERM → SIGKILL (backoff)
+AG -> AG : verify mem% drops
+
+== Audit & Stream ==
+AG -> API : POST /api/ingest/actions\n{type:kill, result:ok, delta_mem:-35%}
+API -> DB : INSERT action/outcome
+API -> NGINX : SSE: memory_pressure_resolved
+NGINX -> UI : event payload
+
+@enduml
+

@@ -147,7 +147,7 @@ services:
       postgres:
         condition: service_healthy
     profiles: ["lab"]
-    privileged: true           # you accept full host control in lab
+    privileged: true           # accept full host control in lab
     pid: "host"
     uts: "host"
     user: "0:0"
