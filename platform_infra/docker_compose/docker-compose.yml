@@ -33,7 +33,7 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-smart} -d ${DB_NAME:-smartdb} -h 127.0.0.1"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -h 127.0.0.1"]
       interval: 5s
       timeout: 3s
       retries: 10
