@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-"""
-    Smart-Monitor Orchestrator (root entrypoint)
+#------------------------------------------
+"""Author: Anselem Okeke
+    MIT License
+    Copyright (c) 2025 Anselem Okeke
+    See LICENSE file in the project root for full license text.
+
+
+
+     Smart-Monitor Orchestrator (root entrypoint)
         - Runs handlers on per-handler cadence with jitter
         - Graceful shutdown (SIGINT/SIGTERM)
         - Env overrides: DRY_RUN, RUN_ONCE, ONLY
@@ -14,8 +21,8 @@
 
           override config (skip remediation)
             DRY_RUN=true python main.py
-
 """
+#------------------------------------------
 
 # === Import handlers ===
 import json

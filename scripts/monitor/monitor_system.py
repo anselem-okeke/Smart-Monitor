@@ -1,6 +1,11 @@
 #------------------------------------------
-"""Author: Anselem Okeke"""
+"""Author: Anselem Okeke
+    MIT License
+    Copyright (c) 2025 Anselem Okeke
+    See LICENSE file in the project root for full license text.
+"""
 #------------------------------------------
+
 import os
 import platform
 import socket

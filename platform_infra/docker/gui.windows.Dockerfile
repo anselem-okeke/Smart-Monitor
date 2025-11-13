@@ -1,3 +1,8 @@
+#  Author: Anselem Okeke
+#    MIT License
+#    Copyright (c) 2025 Anselem Okeke
+#    See LICENSE file in the project root for full license text.
+
 ARG BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022
 FROM ${BASE_IMAGE} as windows
 

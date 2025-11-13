@@ -288,7 +288,7 @@ TLS_FULLCHAIN=/etc/smart-monitor/tls/fullchain.pem
 TLS_PRIVKEY=/etc/smart-monitor/tls/privkey.pem
 
 # GUI
-SMARTMON_API_KEY=dev-please-change
+SMARTMON_API_KEY=
 APPROVED_JSON_HOST=/etc/smart-monitor/approved_services.json
 APP_META_HOST=/etc/smart-monitor/app_meta.json
 GUI_PORT=5003
@@ -895,7 +895,7 @@ C:\smart-monitor\.venv\Scripts\pip.exe install -r C:\smart-monitor\requirements.
 ```
 
 Create `C:\smart-monitor\.env`:
-```MODE=collector
+```shell
 LOG_LEVEL=INFO
 DB_HOST=127.0.0.1
 DB_PORT=
@@ -908,7 +908,7 @@ Option A — NSSM (Recommended)
 
 - Download NSSM (you can use chocolatey) and place nssm.exe in C:\Windows\System32 or keep its folder in PATH. 
 - Install the service:
-```# Paths
+```shell
 $AppPath = "C:\smart-monitor\.venv\Scripts\python.exe"
 $Args    = "-m smart_monitor.main"
 $SrvName = "SmartMonitor"
@@ -926,7 +926,6 @@ nssm set $SrvName AppRotateFiles 1
 nssm set $SrvName AppRotateOnline 1
 nssm set $SrvName Start SERVICE_AUTO_START
 nssm set $SrvName AppEnvironmentExtra "MODE=collector" "LOG_LEVEL=INFO"
-# If your app reads .env itself, AppEnvironmentExtra is optional
 
 nssm start $SrvName
 ```
@@ -992,3 +991,8 @@ git -C C:\smart-monitor pull
 C:\smart-monitor\.venv\Scripts\pip.exe install -r C:\smart-monitor\requirements.txt
 nssm start SmartMonitor
 ```
+### License
+
+This project is licensed under the [MIT License](./LICENSE).
+
+© 2025 Anselem Okeke

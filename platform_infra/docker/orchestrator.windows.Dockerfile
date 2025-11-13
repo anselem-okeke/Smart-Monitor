@@ -1,3 +1,8 @@
+#  Author: Anselem Okeke
+#    MIT License
+#    Copyright (c) 2025 Anselem Okeke
+#    See LICENSE file in the project root for full license text.
+
 # ─────────────────────────────────────────────────────────────
 # Smart-Monitor Orchestrator (Cross-Platform)
 #   • Windows → mcr.microsoft.com/windows/servercore:ltsc2022

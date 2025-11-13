@@ -7,7 +7,22 @@
     <list default="true" id="13852bf5-efb7-4174-a74c-642c81305c61" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/read_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/read_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/entrypoint.gui.windows.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/entrypoint.gui.windows.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/entrypoint.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/entrypoint.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/entrypoint.sh" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/entrypoint.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/gui.linux.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/gui.linux.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/gui.windows.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/gui.windows.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/orchestrator.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/orchestrator.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/orchestrator.linux.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/orchestrator.linux.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/orchestrator.windows.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/orchestrator.windows.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/env.template" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/env.template" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/monitor/monitor_system.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/monitor_system.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/monitor/network_tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/network_tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/monitor/process_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/process_monitor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
