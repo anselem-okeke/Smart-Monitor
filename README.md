@@ -1,6 +1,7 @@
 ## Smart-Monitor  (In Production - live)
 
 ![Smart-Monitor Lab – Architecture](docs/overview/smart-monitor.svg)
+![Smart-Monitor - Flowchart](docs/overview/SmartMonitor.svg)
 
 ### Motivation for Developing Smart-Monitor
 

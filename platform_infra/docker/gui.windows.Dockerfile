@@ -8,10 +8,16 @@ FROM ${BASE_IMAGE} as windows
 
 SHELL ["powershell","-NoProfile","-ExecutionPolicy","Bypass","-Command"]
 
-LABEL org.opencontainers.image.title="Smart Monitor GUI" \
-      org.opencontainers.image.description="Flask UI via Waitress on Windows" \
+# OCI Metadata Labels
+LABEL org.opencontainers.image.title="Smart Monitor Orchestrator" \
+      org.opencontainers.image.description="Self-healing observability platform for hybrid systems" \
       org.opencontainers.image.source="https://github.com/anselem-okeke/Smart-Monitor" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Anselem Dev" \
+      org.opencontainers.image.authors="Anselem Okeke <anselem.okekee@gmail.com>" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.documentation="https://github.com/anselem-dev/smart-monitor/docs"
+
 
 # ── Runtime env knobs (safe defaults; override at run) ──
 ENV PYTHONUNBUFFERED=1 \

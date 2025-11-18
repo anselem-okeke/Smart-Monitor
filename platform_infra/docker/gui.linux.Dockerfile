@@ -11,6 +11,16 @@
 ARG PY_BASE=python:3.11-slim-bookworm
 FROM ${PY_BASE} AS builder
 
+# OCI Metadata Labels
+LABEL org.opencontainers.image.title="Smart Monitor Orchestrator" \
+      org.opencontainers.image.description="Self-healing observability platform for hybrid systems" \
+      org.opencontainers.image.source="https://github.com/anselem-okeke/Smart-Monitor" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Anselem Dev" \
+      org.opencontainers.image.authors="Anselem Okeke <anselem.okekee@gmail.com>" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.documentation="https://github.com/anselem-dev/smart-monitor/docs"
+
 WORKDIR /app
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
 
