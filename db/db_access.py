@@ -1,6 +1,7 @@
 # db_access.py (portable drop-in)
 import os, socket, platform
 from datetime import datetime, timedelta
+from typing import List, Tuple, Any
 
 from db.core import connect_ro
 
@@ -238,9 +239,108 @@ def recent_load_samples(host, samples=3, minutes=5):
         cur.execute(sql, (t, host))
         return cur.fetchall()
 
+def recent_unhealthy_pods(
+    cluster_name: str,
+    minutes: int = 5,
+) -> List[Tuple[Any, ...]]:
+    """
+    Return recent *unhealthy* pod snapshots for this cluster.
+
+    "Unhealthy" here means problem_type <> 'Healthy'.
+
+    Time range:
+      - only rows with timestamp > now - minutes
+
+    Columns (tuple order):
+      0: id
+      1: timestamp
+      2: cluster_name
+      3: namespace
+      4: pod_name
+      5: phase
+      6: problem_type
+      7: problem_reason
+      8: problem_message
+      9: total_restart_count
+     10: last_exit_code
+     11: last_termination_reason
+     12: last_termination_oom
+    """
+    threshold = (datetime.utcnow() - timedelta(minutes=minutes)
+                 ).strftime("%Y-%m-%d %H:%M:%S")
+
+    sql = f"""
+        SELECT
+            id,
+            "timestamp",
+            cluster_name,
+            namespace,
+            pod_name,
+            phase,
+            problem_type,
+            problem_reason,
+            problem_message,
+            total_restart_count,
+            last_exit_code,
+            last_termination_reason,
+            last_termination_oom
+        FROM k8s_pod_health
+        WHERE "timestamp" > {_P}
+          AND cluster_name = {_P}
+          AND problem_type <> 'Healthy'
+        ORDER BY "timestamp" DESC
+    """
+
+    with connect_ro() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (threshold, cluster_name))
+        return cur.fetchall()
 
 
+#
+#
+#
+# rows = recent_unhealthy_pods("kind-smart-monitor", minutes=10)
+# print(f"Found {len(rows)} unhealthy snapshots")
+# for r in rows[:5]:
+#     print(r)
+#
 
 
+def recent_unhealthy_cluster_events(
+    cluster_name: str,
+    minutes: int = 5,
+) -> List[Tuple[Any, ...]]:
+    """
+    Return recent *unhealthy* cluster snapshots.
 
+    "Unhealthy" here means api_reachable = FALSE.
 
+    Expected k8s_cluster_health columns:
+      0: id
+      1: timestamp
+      2: cluster_name
+      3: api_reachable
+      4: k8s_version
+    """
+    threshold = (datetime.utcnow() - timedelta(minutes=minutes)
+                 ).strftime("%Y-%m-%d %H:%M:%S")
+
+    sql = f"""
+        SELECT
+            id,
+            "timestamp",
+            cluster_name,
+            api_reachable,
+            k8s_version
+        FROM k8s_cluster_health
+        WHERE "timestamp" > {_P}
+          AND cluster_name = {_P}
+          AND api_reachable = FALSE
+        ORDER BY "timestamp" DESC
+    """
+
+    with connect_ro() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (threshold, cluster_name))
+        return cur.fetchall()

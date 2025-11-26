@@ -1,0 +1,46 @@
+{
+  "enabled": true,
+
+  "dry_run": true,
+
+  "namespace_blacklist": [
+    "kube-system",
+    "kube-public",
+    "kube-node-lease"
+  ],
+
+  "namespace_whitelist": [],
+
+  "pod_name_blacklist": [
+    "smart-monitor-orchestrator",
+    "smart-monitor-db",
+    "kube-apiserver",
+    "kube-scheduler",
+    "kube-controller-manager"
+  ],
+
+  "cooldown_seconds_per_pod": 300,
+
+  "max_actions_per_pod": {
+    "window_seconds": 3600,
+    "max_actions": 3
+  },
+
+  "max_actions_global": {
+    "window_seconds": 600,
+    "max_actions": 20
+  },
+
+  "allowed_auto_actions": {
+    "CrashLoopBackOff": true,
+    "OOMKilled": false,
+    "ProbeFailure": false,
+    "StuckTerminating": false,
+    "ImagePullBackOff": false,
+    "ErrImagePull": false,
+    "LongPending": false,
+    "Unschedulable": false,
+    "Evicted": false,
+    "Flapping": false
+  }
+}

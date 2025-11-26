@@ -31,22 +31,6 @@ BACKOFF_WINDOW_MIN  = int(os.getenv("SMARTMON_RESTART_BACKOFF_WINDOW_MIN", "30")
 
 THIS_HOST = socket.gethostname()
 
-# def _normalize_status_param(raw: str):
-#     if not raw:
-#         return None
-#     s = raw.strip().lower()
-#     # strip any " (…)" suffixes like "active (running)"
-#     s = re.sub(r"\s*\(.*\)$", "", s)
-#     if s in ("any", "any status", "all"):
-#         return None
-#     if s in ("active", "running"):
-#         return "active"
-#     if s in ("stopped", "inactive"):
-#         return "stopped"
-#     if s in ("failed",):
-#         return "failed"
-#     return s
-
 # ─────────────────────────────────────────────────────────────────────────────
 # List + CSV
 # ─────────────────────────────────────────────────────────────────────────────

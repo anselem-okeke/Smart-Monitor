@@ -47,6 +47,10 @@ from scripts.recovery.disk.main import handle_disk_recovery
 from scripts.recovery.metrics.main import handle_metric_recovery
 from scripts.recovery.network.main import handle_network_recovery
 from scripts.recovery.disk.collect_smart import collect_smart_once
+from scripts.k8s.monitor.monitor_k8s_pods import handle_monitor_k8s_pods
+from scripts.k8s.monitor.monitor_k8s_cluster import handle_monitor_k8s_cluster
+from scripts.k8s.recovery.main_pod_recovery import handle_k8s_pod_recovery
+from scripts.k8s.recovery.main_cluster_recovery import handle_k8s_cluster_recovery
 
 monotonic = time.monotonic
 HOSTNAME = socket.gethostname()
@@ -199,8 +203,39 @@ HANDLERS = [
         "jitter": 0.10,
         "timeout": 180,
         "next": 0.0,
-    }
+    },
 
+    {
+        "name": "k8s:pod_health",
+        "fn": handle_monitor_k8s_pods,
+        "interval": 60,
+        "jitter": 0.10,
+        "next": 0.0,
+    },
+
+    {
+        "name": "k8s:cluster_health",
+        "fn": handle_monitor_k8s_cluster,
+        "interval": 60,
+        "jitter": 0.10,
+        "next": 0.0,
+    },
+
+    {
+        "name": "k8s:cluster_recovery",
+        "fn": handle_k8s_cluster_recovery,
+        "interval": 60,
+        "jitter": 0.10,
+        "next": 0.0,
+    },
+
+    {
+        "name": "k8s:pod_recovery",
+        "fn": handle_k8s_pod_recovery,
+        "interval": 60,   # run every 60s in normal mode
+        "jitter": 0.10,
+        "next": 0.0,
+    }
 ]
 
 def _with_jitter(base, frac):

@@ -370,6 +370,119 @@ def log_smart_health(entries):
         print(f"[ERROR] log_smart_health: {e}")
 
 
+# ------------------------------------------
+# Kubernetes v1 logging
+#   - k8s_pod_health: only problematic pods (CrashLoop, OOM, ImagePull, LongPending)
+#   - k8s_cluster_health: API up/down snapshots
+# ------------------------------------------
+from typing import Dict, Any
+
+
+def log_k8s_pod_health(incident: Dict[str, Any]) -> None:
+    """
+    Insert a single Kubernetes pod incident into k8s_pod_health.
+
+    This is **incident-only**: call it only when there is a problem, for example:
+      - problem_type = 'CrashLoopBackOff'
+      - problem_type = 'ImagePullBackOff' or 'ErrImagePull'
+      - problem_type = 'OOMKilled'
+      - problem_type = 'LongPending'
+
+    Expected keys in `incident`:
+      - cluster_name: str
+      - namespace: str
+      - pod_name: str
+      - phase: Optional[str]  (Running / Pending / Failed / Unknown)
+      - problem_type: Optional[str]
+      - problem_reason: Optional[str]
+      - problem_message: Optional[str]
+      - total_restart_count: Optional[int]
+      - last_exit_code: Optional[int]
+      - last_termination_reason: Optional[str]
+      - last_termination_oom: Optional[bool]
+    """
+    sql = f"""
+        INSERT INTO k8s_pod_health (
+            "timestamp",
+            cluster_name,
+            namespace,
+            pod_name,
+            phase,
+            problem_type,
+            problem_reason,
+            problem_message,
+            total_restart_count,
+            last_exit_code,
+            last_termination_reason,
+            last_termination_oom
+        ) VALUES (
+            CURRENT_TIMESTAMP,
+            {ph(11)}
+        )
+    """
+
+    params = (
+        incident.get("cluster_name"),
+        incident.get("namespace"),
+        incident.get("pod_name"),
+        incident.get("phase"),
+        incident.get("problem_type"),
+        incident.get("problem_reason"),
+        _trim(incident.get("problem_message"), 2000),
+        _i(incident.get("total_restart_count")),
+        _i(incident.get("last_exit_code")),
+        incident.get("last_termination_reason"),
+        bool(incident.get("last_termination_oom")) if incident.get("last_termination_oom") is not None else None,
+    )
+
+    try:
+        with connect_rw() as conn:
+            execute(conn, sql, params)
+        print("[INFO] k8s_pod_health insert OK")
+    except Exception as e:
+        print(f"[ERROR] log_k8s_pod_health: {e}")
+
+
+def log_k8s_cluster_health(snapshot: Dict[str, Any]) -> None:
+    """
+    Insert a Kubernetes cluster API health snapshot into k8s_cluster_health.
+
+    Recommended usage for v1:
+      - Call this only when API is unreachable (api_reachable = False)
+        and optionally when it recovers (api_reachable = True).
+
+    Expected keys in `snapshot`:
+      - cluster_name: str
+      - api_reachable: bool
+      - k8s_version: Optional[str]
+    """
+    sql = f"""
+        INSERT INTO k8s_cluster_health (
+            "timestamp",
+            cluster_name,
+            api_reachable,
+            k8s_version
+        ) VALUES (
+            CURRENT_TIMESTAMP,
+            {ph(3)}
+        )
+    """
+
+    params = (
+        snapshot.get("cluster_name"),
+        bool(snapshot.get("api_reachable")),
+        snapshot.get("k8s_version"),
+    )
+
+    try:
+        with connect_rw() as conn:
+            execute(conn, sql, params)
+        print("[INFO] k8s_cluster_health insert OK")
+    except Exception as e:
+        print(f"[ERROR] log_k8s_cluster_health: {e}")
+
+
+
 
 
 

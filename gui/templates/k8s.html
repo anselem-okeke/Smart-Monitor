@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h2>Kubernetes</h2>
+
+<!-- ===================== Pods ===================== -->
+<h3 style="margin-top:10px;">Pods</h3>
+
+<form id="podsForm" class="filters" style="margin:8px 0;">
+  <input name="cluster" placeholder="cluster (optional)" />
+  <input name="namespace" placeholder="namespace (optional)" />
+  <select name="problem_type">
+    <option value="">Any problem</option>
+    <option value="Healthy">Healthy</option>
+    <option value="CrashLoopBackOff">CrashLoopBackOff</option>
+    <option value="OOMKilled">OOMKilled</option>
+    <option value="ImagePullBackOff">ImagePullBackOff</option>
+    <option value="ErrImagePull">ErrImagePull</option>
+    <option value="LongPending">LongPending</option>
+    <option value="ProbeFailure">ProbeFailure</option>
+    <option value="Unschedulable">Unschedulable</option>
+    <option value="Evicted">Evicted</option>
+    <option value="StuckTerminating">StuckTerminating</option>
+  </select>
+
+  <label style="display:flex; align-items:center; gap:6px;">
+    <input type="checkbox" name="only_unhealthy" checked />
+    only unhealthy
+  </label>
+
+  <input name="since_minutes" type="number" min="1" value="60" title="Since (minutes)" />
+  <input name="limit" type="number" min="10" max="500" value="50" />
+  <button type="submit">Apply</button>
+</form>
+
+<table class="table" id="podsTable">
+  <thead>
+    <tr>
+      <th>Time</th><th>Cluster</th><th>Namespace</th><th>Pod</th>
+      <th>Phase</th><th>Problem</th><th>Restarts</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<div class="pager">
+  <button id="podsPrev">Prev</button>
+  <span id="podsPageInfo"></span>
+  <button id="podsNext">Next</button>
+</div>
+
+<!-- ===================== Clusters ===================== -->
+<h3 style="margin-top:22px;">Clusters</h3>
+
+<form id="clustersForm" class="filters" style="margin:8px 0;">
+  <input name="cluster" placeholder="cluster (optional)" />
+  <input name="since_minutes" type="number" min="1" value="240" title="Since (minutes)" />
+  <input name="limit" type="number" min="10" max="200" value="50" />
+  <button type="submit">Apply</button>
+</form>
+
+<table class="table" id="clustersTable">
+  <thead>
+    <tr><th>Time</th><th>Cluster</th><th>API Reachable</th><th>Version</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<div class="pager">
+  <button id="clustersPrev">Prev</button>
+  <span id="clustersPageInfo"></span>
+  <button id="clustersNext">Next</button>
+</div>
+
+<script>
+(function(){
+  // ---------------- Pods ----------------
+  const podsForm = document.getElementById('podsForm');
+  const podsTb = document.querySelector('#podsTable tbody');
+  const podsPrev = document.getElementById('podsPrev');
+  const podsNext = document.getElementById('podsNext');
+  const podsPageInfo = document.getElementById('podsPageInfo');
+
+  let podsOffset = 0;
+  let podsTotal = 0;
+
+  function formToQuery(form, offset) {
+    const fd = new FormData(form);
+    const p = new URLSearchParams();
+    for (const [k,v] of fd.entries()) {
+      if (k === "only_unhealthy") continue; // checkbox handled below
+      if (v !== '') p.append(k, v);
+    }
+    // checkbox: send only if checked (aligns with API bool parser)
+    const onlyUnhealthy = form.querySelector('input[name="only_unhealthy"]').checked;
+    if (onlyUnhealthy) p.append("only_unhealthy", "1");
+
+    p.append("offset", offset);
+    return p.toString();
+  }
+
+  async function loadPods(){
+    const q = formToQuery(podsForm, podsOffset);
+    const res = await fetch('/api/k8s/pods?' + q, { cache: 'no-store' });
+    const data = await res.json();
+
+    podsTotal = data.total || 0;
+    const items = data.items || [];
+    const limit = Number(new FormData(podsForm).get('limit') || 50);
+
+    if (!items.length) {
+      podsTb.innerHTML = `<tr><td colspan="7" class="muted">No pods found for this query (or no snapshots logged).</td></tr>`;
+    } else {
+      podsTb.innerHTML = items.map(p => `
+        <tr>
+          <td>${p.timestamp || ''}</td>
+          <td>${p.cluster_name || ''}</td>
+          <td>${p.namespace || ''}</td>
+          <td>${p.pod_name || ''}</td>
+          <td>${p.phase || ''}</td>
+          <td>${p.problem_type || ''}</td>
+          <td>${p.total_restart_count ?? ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    const start = podsTotal ? (podsOffset + 1) : 0;
+    const end = Math.min(podsOffset + limit, podsTotal);
+    podsPageInfo.textContent = `${start}-${end} of ${podsTotal}`;
+    podsPrev.disabled = podsOffset <= 0;
+    podsNext.disabled = podsOffset + limit >= podsTotal;
+
+    // deep link for pods
+    const url = new URL(location.href);
+    url.searchParams.set("pods_offset", String(podsOffset));
+    history.replaceState(null, '', url);
+  }
+
+  podsForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    podsOffset = 0;
+    loadPods();
+  });
+
+  podsPrev.addEventListener('click', () => {
+    const limit = Number(new FormData(podsForm).get('limit') || 50);
+    podsOffset = Math.max(0, podsOffset - limit);
+    loadPods();
+  });
+
+  podsNext.addEventListener('click', () => {
+    const limit = Number(new FormData(podsForm).get('limit') || 50);
+    podsOffset = podsOffset + limit;
+    loadPods();
+  });
+
+  // ---------------- Clusters ----------------
+  const clustersForm = document.getElementById('clustersForm');
+  const clustersTb = document.querySelector('#clustersTable tbody');
+  const clustersPrev = document.getElementById('clustersPrev');
+  const clustersNext = document.getElementById('clustersNext');
+  const clustersPageInfo = document.getElementById('clustersPageInfo');
+
+  let clustersOffset = 0;
+  let clustersTotal = 0;
+
+  function formToQuerySimple(form, offset) {
+    const fd = new FormData(form);
+    const p = new URLSearchParams();
+    for (const [k,v] of fd.entries()) if (v !== '') p.append(k, v);
+    p.append("offset", offset);
+    return p.toString();
+  }
+
+  async function loadClusters(){
+    const q = formToQuerySimple(clustersForm, clustersOffset);
+    const res = await fetch('/api/k8s/clusters?' + q, { cache: 'no-store' });
+    const data = await res.json();
+
+    clustersTotal = data.total || 0;
+    const items = data.items || [];
+    const limit = Number(new FormData(clustersForm).get('limit') || 50);
+
+    if (!items.length) {
+      clustersTb.innerHTML = `<tr><td colspan="4" class="muted">No clusters found for this query (or no snapshots logged).</td></tr>`;
+    } else {
+      clustersTb.innerHTML = items.map(c => `
+        <tr>
+          <td>${c.timestamp || ''}</td>
+          <td>${c.cluster_name || ''}</td>
+          <td class="sev ${c.api_reachable ? 'info' : 'critical'}">${c.api_reachable ? 'true' : 'false'}</td>
+          <td>${c.k8s_version || ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    const start = clustersTotal ? (clustersOffset + 1) : 0;
+    const end = Math.min(clustersOffset + limit, clustersTotal);
+    clustersPageInfo.textContent = `${start}-${end} of ${clustersTotal}`;
+    clustersPrev.disabled = clustersOffset <= 0;
+    clustersNext.disabled = clustersOffset + limit >= clustersTotal;
+
+    const url = new URL(location.href);
+    url.searchParams.set("clusters_offset", String(clustersOffset));
+    history.replaceState(null, '', url);
+  }
+
+  clustersForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    clustersOffset = 0;
+    loadClusters();
+  });
+
+  clustersPrev.addEventListener('click', () => {
+    const limit = Number(new FormData(clustersForm).get('limit') || 50);
+    clustersOffset = Math.max(0, clustersOffset - limit);
+    loadClusters();
+  });
+
+  clustersNext.addEventListener('click', () => {
+    const limit = Number(new FormData(clustersForm).get('limit') || 50);
+    clustersOffset = clustersOffset + limit;
+    loadClusters();
+  });
+
+  // -------- init (restore offsets from URL) --------
+  (function initFromUrl(){
+    const params = new URLSearchParams(location.search);
+    if (params.has("pods_offset")) podsOffset = Number(params.get("pods_offset")) || 0;
+    if (params.has("clusters_offset")) clustersOffset = Number(params.get("clusters_offset")) || 0;
+  })();
+
+  loadPods();
+  loadClusters();
+})();
+</script>
+
+{% endblock %}

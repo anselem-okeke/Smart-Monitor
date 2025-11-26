@@ -1,0 +1,26 @@
+# crashloop-demo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crashloop-demo
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crashloop-demo
+  template:
+    metadata:
+      labels:
+        app: crashloop-demo
+    spec:
+      containers:
+        - name: crashloop
+          image: busybox:1.36
+          command: ["sh", "-c", "echo 'crashing...'; sleep 2; exit 1"]
+          # optional small limits
+          resources:
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+

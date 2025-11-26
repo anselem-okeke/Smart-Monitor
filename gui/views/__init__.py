@@ -5,4 +5,4 @@ ui_bp = Blueprint(
     static_folder="../static"
 )
 
-from . import overview, hosts, alerts, network, smart, services
+from . import overview, hosts, alerts, network, smart, services, k8s

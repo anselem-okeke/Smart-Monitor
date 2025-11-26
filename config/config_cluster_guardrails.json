@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+
+  "cluster_blacklist": [],
+  "cluster_whitelist": [],
+
+  "min_alert_interval_seconds": 300
+}

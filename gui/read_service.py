@@ -85,6 +85,90 @@ def _latest_per_host(conn, since_iso: str, use_guard: bool = True):
         }
     return out
 
+
+def _k8s_summary(conn, since_iso: str, cluster_name: Optional[str] = None) -> Dict[str, int]:
+    """
+    Returns counts from latest snapshots (per pod / per cluster) within a time window.
+
+    Output:
+      {
+        "k8s_pods_total": int,
+        "k8s_pods_unhealthy": int,
+        "k8s_clusters_total": int,
+        "k8s_clusters_api_down": int,
+      }
+    """
+    out = {
+        "k8s_pods_total": 0,
+        "k8s_pods_unhealthy": 0,
+        "k8s_clusters_total": 0,
+        "k8s_clusters_api_down": 0,
+    }
+
+    # ---- Pods (latest row per pod) ----
+    if _table_exists(conn, "k8s_pod_health"):
+        where = [f'"timestamp" >= {_P}']
+        params = [since_iso]
+
+        if cluster_name:
+            where.append(f"cluster_name = {_P}")
+            params.append(cluster_name)
+
+        where_sql = " AND ".join(where)
+
+        sub = f"""
+            SELECT cluster_name, namespace, pod_name, MAX(id) AS max_id
+            FROM k8s_pod_health
+            WHERE {where_sql}
+            GROUP BY cluster_name, namespace, pod_name
+        """
+
+        sql = f"""
+            SELECT
+              COUNT(*) AS total,
+              SUM(CASE WHEN COALESCE(p.problem_type,'') <> 'Healthy' THEN 1 ELSE 0 END) AS unhealthy
+            FROM k8s_pod_health p
+            JOIN ({sub}) m
+              ON p.id = m.max_id
+        """
+        rows = fetchall_dicts(conn, sql, tuple(params))
+        if rows:
+            out["k8s_pods_total"] = int(rows[0]["total"] or 0)
+            out["k8s_pods_unhealthy"] = int(rows[0]["unhealthy"] or 0)
+
+    # ---- Clusters (latest row per cluster) ----
+    if _table_exists(conn, "k8s_cluster_health"):
+        where = [f'"timestamp" >= {_P}']
+        params = [since_iso]
+
+        if cluster_name:
+            where.append(f"cluster_name = {_P}")
+            params.append(cluster_name)
+
+        where_sql = " AND ".join(where)
+
+        sub = f"""
+            SELECT cluster_name, MAX(id) AS max_id
+            FROM k8s_cluster_health
+            WHERE {where_sql}
+            GROUP BY cluster_name
+        """
+
+        sql = f"""
+            SELECT
+              COUNT(*) AS total,
+              SUM(CASE WHEN c.api_reachable = FALSE THEN 1 ELSE 0 END) AS api_down
+            FROM k8s_cluster_health c
+            JOIN ({sub}) m
+              ON c.id = m.max_id
+        """
+        rows = fetchall_dicts(conn, sql, tuple(params))
+        if rows:
+            out["k8s_clusters_total"] = int(rows[0]["total"] or 0)
+            out["k8s_clusters_api_down"] = int(rows[0]["api_down"] or 0)
+
+    return out
+
 # ───────── Summary & lists ─────────
 
 def get_summary():
@@ -154,6 +238,8 @@ def get_summary():
             FROM alerts ORDER BY id DESC LIMIT 10
         """)
 
+        k8s = _k8s_summary(conn, since_10m)
+
     hosts_inline = active_hosts_list[:4]
     hosts_extra  = max(0, hosts_active_10m - len(hosts_inline))
 
@@ -179,6 +265,8 @@ def get_summary():
         "load_top": {"host": load_top["host"], "value": round(load_top["value"], 2)},
 
         "latest_alerts": latest_alerts,
+
+        **k8s,
     }
 
 def list_hosts():
@@ -638,4 +726,188 @@ def services_count(
     if n > 0:
         return n
     return _services_count_query(False, host, status, since_minutes)
+
+
+# ───────── Kubernetes: latest snapshots (per pod / per cluster) ─────────
+
+def k8s_pods_latest(
+    cluster: Optional[str] = None,
+    namespace: Optional[str] = None,
+    problem_type: Optional[str] = None,
+    only_unhealthy: bool = False,
+    since_minutes: int = 10,
+    limit: int = 300,
+    offset: int = 0,
+):
+    """
+    Latest row per (cluster_name, namespace, pod_name) within a lookback window.
+    Portable SQLite + Postgres (MAX(id) join, no DISTINCT ON).
+
+    Filters:
+      - cluster, namespace
+      - problem_type
+      - only_unhealthy (problem_type != 'Healthy')
+    """
+    since = (datetime.utcnow() - timedelta(minutes=int(since_minutes))).strftime("%Y-%m-%d %H:%M:%S")
+
+    with connect_ro(dicts=True) as conn:
+        if not _table_exists(conn, "k8s_pod_health"):
+            return []
+
+        # subquery filters (to keep grouping small)
+        where_sub, params = [f'"timestamp" >= {_P}'], [since]
+        if cluster:
+            where_sub.append(f"cluster_name = {_P}")
+            params.append(cluster)
+        if namespace:
+            where_sub.append(f"namespace = {_P}")
+            params.append(namespace)
+
+        sub = f"""
+            SELECT cluster_name, namespace, pod_name, MAX(id) AS max_id
+            FROM k8s_pod_health
+            WHERE {" AND ".join(where_sub)}
+            GROUP BY cluster_name, namespace, pod_name
+        """
+
+        # outer filters (after latest-per-pod is selected)
+        where_outer, params2 = [], list(params)
+        if only_unhealthy:
+            where_outer.append("COALESCE(p.problem_type,'') <> 'Healthy'")
+        if problem_type:
+            where_outer.append(f"p.problem_type = {_P}")
+            params2.append(problem_type)
+
+        outer_where_sql = ("WHERE " + " AND ".join(where_outer)) if where_outer else ""
+
+        sql = f"""
+            SELECT
+              p.id, p."timestamp",
+              p.cluster_name, p.namespace, p.pod_name,
+              p.phase, p.problem_type, p.problem_reason, p.problem_message,
+              p.total_restart_count, p.last_exit_code,
+              p.last_termination_reason, p.last_termination_oom
+            FROM k8s_pod_health p
+            JOIN ({sub}) m
+              ON p.id = m.max_id
+            {outer_where_sql}
+            ORDER BY p.id DESC
+            LIMIT {int(limit)} OFFSET {int(offset)}
+        """
+        return fetchall_dicts(conn, sql, tuple(params2))
+
+
+def count_k8s_pods_latest(
+    cluster: Optional[str] = None,
+    namespace: Optional[str] = None,
+    problem_type: Optional[str] = None,
+    only_unhealthy: bool = False,
+    since_minutes: int = 10,
+):
+    """Count rows that would be returned by k8s_pods_latest (pagination support)."""
+    since = (datetime.utcnow() - timedelta(minutes=int(since_minutes))).strftime("%Y-%m-%d %H:%M:%S")
+
+    with connect_ro(dicts=True) as conn:
+        if not _table_exists(conn, "k8s_pod_health"):
+            return 0
+
+        where_sub, params = [f'"timestamp" >= {_P}'], [since]
+        if cluster:
+            where_sub.append(f"cluster_name = {_P}")
+            params.append(cluster)
+        if namespace:
+            where_sub.append(f"namespace = {_P}")
+            params.append(namespace)
+
+        sub = f"""
+            SELECT cluster_name, namespace, pod_name, MAX(id) AS max_id
+            FROM k8s_pod_health
+            WHERE {" AND ".join(where_sub)}
+            GROUP BY cluster_name, namespace, pod_name
+        """
+
+        where_outer, params2 = [], list(params)
+        if only_unhealthy:
+            where_outer.append("COALESCE(p.problem_type,'') <> 'Healthy'")
+        if problem_type:
+            where_outer.append(f"p.problem_type = {_P}")
+            params2.append(problem_type)
+
+        outer_where_sql = ("WHERE " + " AND ".join(where_outer)) if where_outer else ""
+
+        sql = f"""
+            SELECT COUNT(*) AS c
+            FROM k8s_pod_health p
+            JOIN ({sub}) m ON p.id = m.max_id
+            {outer_where_sql}
+        """
+        rows = fetchall_dicts(conn, sql, tuple(params2))
+        return int(rows[0]["c"] if rows else 0)
+
+
+def k8s_clusters_latest(
+    cluster: Optional[str] = None,
+    since_minutes: int = 60,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    Latest row per cluster_name within lookback window.
+    """
+    since = (datetime.utcnow() - timedelta(minutes=int(since_minutes))).strftime("%Y-%m-%d %H:%M:%S")
+    with connect_ro(dicts=True) as conn:
+        if not _table_exists(conn, "k8s_cluster_health"):
+            return []
+
+        where_sub, params = [f'"timestamp" >= {_P}'], [since]
+        if cluster:
+            where_sub.append(f"cluster_name = {_P}")
+            params.append(cluster)
+
+        sub = f"""
+            SELECT cluster_name, MAX(id) AS max_id
+            FROM k8s_cluster_health
+            WHERE {" AND ".join(where_sub)}
+            GROUP BY cluster_name
+        """
+
+        sql = f"""
+            SELECT c.id, c."timestamp", c.cluster_name, c.api_reachable, c.k8s_version
+            FROM k8s_cluster_health c
+            JOIN ({sub}) m ON c.id = m.max_id
+            ORDER BY c.id DESC
+            LIMIT {int(limit)} OFFSET {int(offset)}
+        """
+        return fetchall_dicts(conn, sql, tuple(params))
+
+
+def count_k8s_clusters_latest(
+    cluster: Optional[str] = None,
+    since_minutes: int = 60,
+):
+    since = (datetime.utcnow() - timedelta(minutes=int(since_minutes))).strftime("%Y-%m-%d %H:%M:%S")
+    with connect_ro(dicts=True) as conn:
+        if not _table_exists(conn, "k8s_cluster_health"):
+            return 0
+
+        where_sub, params = [f'"timestamp" >= {_P}'], [since]
+        if cluster:
+            where_sub.append(f"cluster_name = {_P}")
+            params.append(cluster)
+
+        sub = f"""
+            SELECT cluster_name, MAX(id) AS max_id
+            FROM k8s_cluster_health
+            WHERE {" AND ".join(where_sub)}
+            GROUP BY cluster_name
+        """
+
+        sql = f"""
+            SELECT COUNT(*) AS c
+            FROM k8s_cluster_health c
+            JOIN ({sub}) m ON c.id = m.max_id
+        """
+        rows = fetchall_dicts(conn, sql, tuple(params))
+        return int(rows[0]["c"] if rows else 0)
+
 

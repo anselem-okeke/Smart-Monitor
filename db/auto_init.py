@@ -12,6 +12,8 @@ REQUIRED_TABLES = [
     "process_status",
     "restart_attempts",
     "smart_health",
+    "k8s_pod_health",
+    "k8s_cluster_health",
 ]
 
 def default_db_path():

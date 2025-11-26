@@ -1,0 +1,25 @@
+# crashloop-demo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: imagepullbackoff
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: imagepullbackoff-demo
+  template:
+    metadata:
+      labels:
+        app: imagepullbackoff-demo
+    spec:
+      containers:
+        - name: imagepullbackoff
+          image: image-does-not-exist
+          command: ["sh", "-c", "echo 'crashing...'; sleep 2; exit 1"]
+          # optional small limits
+          resources:
+            limits:
+              cpu: "100m"
+              memory: "64Mi"

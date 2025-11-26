@@ -5,19 +5,53 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="13852bf5-efb7-4174-a74c-642c81305c61" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/build-push-gui.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/build-push-gui.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/publish-multi-platform.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/publish-multi-platform.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/overview/SmartMonitor_Lab_Sequence.puml" beforeDir="false" afterPath="$PROJECT_DIR$/docs/overview/SmartMonitor_Lab_Sequence.puml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gui/api/alerts.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/api/alerts.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gui/api/hosts.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/api/hosts.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker/gui.linux.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/gui.linux.Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker/gui.windows.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/gui.windows.Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-omni-shim" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/db/auto_init.py" beforeDir="false" afterPath="$PROJECT_DIR$/db/auto_init.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/db/db_access.py" beforeDir="false" afterPath="$PROJECT_DIR$/db/db_access.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/db/db_logger.py" beforeDir="false" afterPath="$PROJECT_DIR$/db/db_logger.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/db/schema_pg.sql" beforeDir="false" afterPath="$PROJECT_DIR$/db/schema_pg.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/api/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/api/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/api/network.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/api/network.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/api/services.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/api/services.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/read_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/read_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/static/css/styles.css" beforeDir="false" afterPath="$PROJECT_DIR$/gui/static/css/styles.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/templates/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/gui/templates/base.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/templates/overview.html" beforeDir="false" afterPath="$PROJECT_DIR$/gui/templates/overview.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gui/views/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/gui/views/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/network_recovery.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/network_recovery.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3-2.5.0.dist-info/INSTALLER" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3-2.5.0.dist-info/METADATA" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3-2.5.0.dist-info/RECORD" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3-2.5.0.dist-info/WHEEL" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3-2.5.0.dist-info/licenses/LICENSE.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/_version.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/_version.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/connection.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/connection.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/contrib/emscripten/fetch.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/contrib/emscripten/fetch.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/contrib/emscripten/response.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/contrib/emscripten/response.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/contrib/pyopenssl.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/contrib/pyopenssl.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/exceptions.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/exceptions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/http2/connection.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/http2/connection.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/poolmanager.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/poolmanager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/response.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/response.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/util/request.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/util/request.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/util/ssl_.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/util/ssl_.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/util/ssl_match_hostname.py" beforeDir="false" afterPath="$PROJECT_DIR$/venv/Lib/site-packages/urllib3/util/ssl_match_hostname.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -34,6 +68,34 @@
     <property name="add_unversioned_files" value="$PROJECT_DIR$/platform_infra/docker_compose/.env" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="settings.editor.selected.configurable" value="Errors" />
+  </component>
+  <component name="RunManager">
+    <configuration name="monitor_k8s_pods" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="Smart-Monitor" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/scripts/k8s/monitor" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="G:\DevOps\section8_vprofile_project_manual_automation\vprofile-project\vagrant\Manual_provisioning_WinMacIntel\Smart-Monitor\scripts\k8s\monitor\monitor_k8s_pods.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.monitor_k8s_pods" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">

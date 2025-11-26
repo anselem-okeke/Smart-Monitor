@@ -1,0 +1,25 @@
+# crashloop-demo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: longpending
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: longpending-demo
+  template:
+    metadata:
+      labels:
+        app: longpending-demo
+    spec:
+      containers:
+        - name: crashloop
+          image: busybox:1.36
+          command: ["sh", "-c", "echo 'crashing...'; sleep 2; exit 1"]
+          # optional small limits
+          resources:
+            limits:
+              cpu: "1000"
+              memory: "1Ti"

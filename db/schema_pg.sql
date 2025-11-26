@@ -108,3 +108,53 @@ CREATE TABLE IF NOT EXISTS smart_health (
   temp_c      DOUBLE PRECISION,
   output      TEXT
 );
+
+-- ─────────────────────────────────────────────
+-- Kubernetes v1: Cluster API health
+-- Focus: can Smart-Monitor talk to the API?
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS k8s_cluster_health (
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "timestamp"   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cluster_name  TEXT NOT NULL,        -- e.g. 'kind-smart-monitor'
+  api_reachable BOOLEAN NOT NULL,     -- TRUE if API responded successfully
+  k8s_version   TEXT                  -- e.g. 'v1.34.0'
+);
+
+CREATE INDEX IF NOT EXISTS idx_k8s_cluster_health_name_ts
+  ON k8s_cluster_health (cluster_name, "timestamp" DESC);
+
+-- ─────────────────────────────────────────────
+-- Kubernetes v1: Critical pod failures
+-- Focus: CrashLoopBackOff, ImagePullBackOff, OOMKilled, long Pending
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS k8s_pod_health (
+  id                      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "timestamp"             TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  cluster_name            TEXT NOT NULL,
+  namespace               TEXT NOT NULL,
+  pod_name                TEXT NOT NULL,
+
+  phase                   TEXT,       -- Running / Pending / Failed / Unknown
+
+  -- High-level categorization of the problem:
+  -- 'CrashLoopBackOff', 'ImagePullBackOff', 'ErrImagePull',
+  -- 'OOMKilled', 'LongPending', 'Other'
+  problem_type            TEXT,
+  problem_reason          TEXT,       -- reason from container state / event
+  problem_message         TEXT,       -- human-readable message from K8s
+
+  total_restart_count     INTEGER,    -- sum of restartCount across containers
+
+  last_exit_code          INTEGER,    -- from lastState.terminated.exitCode
+  last_termination_reason TEXT,       -- e.g. 'OOMKilled', 'Error'
+  last_termination_oom    BOOLEAN     -- TRUE if last termination was OOMKilled
+);
+
+CREATE INDEX IF NOT EXISTS idx_k8s_pod_health_cluster_ns_pod_ts
+  ON k8s_pod_health (cluster_name, namespace, pod_name, "timestamp" DESC);
+
+CREATE INDEX IF NOT EXISTS idx_k8s_pod_health_problem_ts
+  ON k8s_pod_health (problem_type, "timestamp" DESC);
+

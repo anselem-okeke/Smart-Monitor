@@ -75,7 +75,7 @@ function showToast(message, {severity='info', source='', timeout=6000} = {}){
   if (timeout > 0) setTimeout(() => { try{ root.removeChild(box);}catch{} }, timeout);
 }
 
-/* ========== YOUR EXISTING OVERVIEW LOGIC (unchanged, but calls showToast) ========== */
+/* ========== EXISTING OVERVIEW LOGIC (unchanged, but calls showToast) ========== */
 (async function init() {
   const cardsEl = document.getElementById('summary-cards');
   const tbody   = document.querySelector('#latest-alerts tbody');
@@ -90,6 +90,11 @@ function showToast(message, {severity='info', source='', timeout=6000} = {}){
 
   function renderCards(s) {
     if (!s) return;
+    const k8sUnhealthy = Number(s.k8s_pods_unhealthy ?? 0);
+    const k8sApiDown   = Number(s.k8s_clusters_api_down ?? 0);
+    const k8sHref = `/k8s?only_unhealthy=1&since_minutes=60`;
+
+
     const cpuNow = Number(s.cpu_now || 0).toFixed(1);
     const cpu1h  = Number(s.cpu_1h_avg || 0).toFixed(1);
     const memNow = Number(s.mem_now || 0).toFixed(1);
@@ -107,6 +112,11 @@ function showToast(message, {severity='info', source='', timeout=6000} = {}){
         <div class="metric">${s.hosts_active_10m}</div>
         <div class="label">Active hosts (10m)</div>
         <div class="subline">${hostBadges(s)}</div>
+      </div>
+      <div class="card" style="cursor:pointer" onclick="location.href='${k8sHref}'">
+        <div class="metric">${k8sUnhealthy}</div>
+        <div class="label">Kubernetes <span class="sub">· unhealthy pods</span></div>
+        <div class="subline">API down: ${k8sApiDown} <span class="sub">·</span> <a href="${k8sHref}" style="text-decoration:underline;">Open</a></div>
       </div>
       <div class="card">
         <div class="metric">${cpuNow}%</div>
@@ -204,170 +214,6 @@ function showToast(message, {severity='info', source='', timeout=6000} = {}){
   window.addEventListener('beforeunload', () => { closed = true; if (es) es.close(); });
 })();
 </script>
-
-
-
-
-<!--<script>-->
-<!--(async function init() {-->
-<!--  const cardsEl = document.getElementById('summary-cards');-->
-<!--  const tbody   = document.querySelector('#latest-alerts tbody');-->
-<!--  const MAX_ROWS = 200;-->
-
-<!--  function hostBadges(data){-->
-<!--    const names = (data.hosts_inline || []).map(h =>-->
-<!--      `<a class="chip" href="/hosts/${encodeURIComponent(h)}" target="_blank">${h}</a>`).join(' ');-->
-<!--    const extra = (data.hosts_extra || 0) > 0 ? `<span class="chip muted">+${data.hosts_extra} more</span>` : '';-->
-<!--    return names + (extra ? ` ${extra}` : '');-->
-<!--  }-->
-
-<!--  function renderCards(s) {-->
-<!--      if (!s) return;-->
-<!--      const cpuNow = Number(s.cpu_now || 0).toFixed(1);-->
-<!--      const cpu1h  = Number(s.cpu_1h_avg || 0).toFixed(1);-->
-<!--      const memNow = Number(s.mem_now || 0).toFixed(1);-->
-<!--      const mem1h  = Number(s.mem_1h_avg || 0).toFixed(1);-->
-<!--      const loadNow= Number(s.load_now || 0).toFixed(2);-->
-<!--      const load1h = Number(s.load_1h_avg || 0).toFixed(2);-->
-
-<!--      const cpuTop = s.cpu_top && s.cpu_top.host ?-->
-<!--        `<a href="/hosts/${encodeURIComponent(s.cpu_top.host)}" target="_blank">${s.cpu_top.host}</a> ${Number(s.cpu_top.value).toFixed(1)}%` : '—';-->
-<!--      const memTop = s.mem_top && s.mem_top.host ?-->
-<!--        `<a href="/hosts/${encodeURIComponent(s.mem_top.host)}" target="_blank">${s.mem_top.host}</a> ${Number(s.mem_top.value).toFixed(1)}%` : '—';-->
-<!--      const loadTop = s.load_top && s.load_top.host ?-->
-<!--        `<a href="/hosts/${encodeURIComponent(s.load_top.host)}" target="_blank">${s.load_top.host}</a> ${Number(s.load_top.value).toFixed(2)}` : '—';-->
-
-<!--      document.getElementById('summary-cards').innerHTML = `-->
-<!--        <div class="card">-->
-<!--          <div class="metric">${s.hosts_active_10m}</div>-->
-<!--          <div class="label">Active hosts (10m)</div>-->
-<!--          <div class="subline">${hostBadges(s)}</div>-->
-<!--        </div>-->
-
-<!--        <div class="card">-->
-<!--          <div class="metric">${cpuNow}%</div>-->
-<!--          <div class="label">CPU now <span class="sub">· 1h avg ${cpu1h}%</span></div>-->
-<!--          <div class="subline">Top: ${cpuTop}</div>-->
-<!--        </div>-->
-
-<!--        <div class="card">-->
-<!--          <div class="metric">${memNow}%</div>-->
-<!--          <div class="label">Memory now <span class="sub">· 1h avg ${mem1h}%</span></div>-->
-<!--          <div class="subline">Top: ${memTop}</div>-->
-<!--        </div>-->
-
-<!--        <div class="card">-->
-<!--          <div class="metric">${loadNow}</div>-->
-<!--          <div class="label">Load now <span class="sub">· 1h avg ${load1h}</span></div>-->
-<!--          <div class="subline">Top: ${loadTop}</div>-->
-<!--        </div>-->
-<!--      `;-->
-<!--    }-->
-
-<!--   function renderCpuTop(list){-->
-<!--      const tbody = document.querySelector('#cpu-top tbody');-->
-<!--      if (!tbody) return;-->
-<!--      if (!list || !list.length){-->
-<!--        tbody.innerHTML = `<tr><td colspan="4">No data</td></tr>`;-->
-<!--        return;-->
-<!--      }-->
-<!--      tbody.innerHTML = list.map(h => `-->
-<!--        <tr>-->
-<!--          <td><a href="/hosts/${encodeURIComponent(h.hostname)}" target="_blank">${h.hostname}</a></td>-->
-<!--          <td>${Number(h.cpu_now).toFixed(1)}%</td>-->
-<!--          <td>${Number(h.cpu_1h).toFixed(1)}%</td>-->
-<!--          <td>${h.last_ts}</td>-->
-<!--        </tr>-->
-<!--      `).join('');-->
-<!--    }-->
-
-
-<!--  function renderInitialRows(list) {-->
-<!--    const rows = (list || []).map(a => `-->
-<!--      <tr>-->
-<!--        <td>${a.timestamp}</td>-->
-<!--        <td>${a.hostname || ''}</td>-->
-<!--        <td class="sev ${a.severity}">${a.severity}</td>-->
-<!--        <td>${a.source}</td>-->
-<!--        <td>${a.message}</td>-->
-<!--      </tr>`).join('');-->
-<!--    tbody.innerHTML = rows || `<tr data-placeholder="1"><td colspan="5">No recent alerts</td></tr>`;-->
-<!--  }-->
-
-<!--  async function fetchSummary() {-->
-<!--    try {-->
-<!--      const res = await fetch('/api/summary', { headers: { 'Accept': 'application/json' }});-->
-<!--      if (!res.ok) { console.error('summary failed', res.status); return; }-->
-<!--      const data = await res.json();-->
-<!--      renderCards(data);-->
-<!--      renderCpuTop(data.cpu_top || []);-->
-<!--      // (re)seed table only if it's still in placeholder state-->
-<!--      if (tbody.children.length === 1 && tbody.firstElementChild.dataset.placeholder === "1") {-->
-<!--        renderInitialRows(data.latest_alerts);-->
-<!--      }-->
-<!--    } catch (e) {-->
-<!--      console.error('summary exception', e);-->
-<!--    }-->
-<!--  }-->
-
-<!--  // 1) Initial summary load-->
-<!--  await fetchSummary();-->
-
-<!--  // 2) Periodic refresh so cards update even without new alerts-->
-<!--  setInterval(fetchSummary, 60000);-->
-
-<!--  // 3) Live updates via SSE, with throttled summary refresh-->
-<!--  let es, backoff = 1000, backMax = 15000, closed = false, refreshTimer = null;-->
-
-<!--  function scheduleSummaryRefresh() {-->
-<!--    if (refreshTimer) return;-->
-<!--    refreshTimer = setTimeout(async () => {-->
-<!--      refreshTimer = null;-->
-<!--      await fetchSummary();-->
-<!--    }, 5000); // refresh cards ~5s after first alert in a burst-->
-<!--  }-->
-
-<!--  function connect() {-->
-<!--    try {-->
-<!--      es = new EventSource('/api/stream/alerts');-->
-
-<!--      es.addEventListener('alert', ev => {-->
-<!--        backoff = 1000; // reset on data-->
-<!--        const a = JSON.parse(ev.data);-->
-<!--        // remove placeholder if present-->
-<!--        if (tbody.firstElementChild && tbody.firstElementChild.dataset.placeholder === "1") {-->
-<!--          tbody.removeChild(tbody.firstElementChild);-->
-<!--        }-->
-<!--        const tr = document.createElement('tr');-->
-<!--        tr.innerHTML = `-->
-<!--          <td>${a.timestamp}</td>-->
-<!--          <td>${a.hostname || ''}</td>-->
-<!--          <td class="sev ${a.severity}">${a.severity}</td>-->
-<!--          <td>${a.source}</td>-->
-<!--          <td>${a.message}</td>`;-->
-<!--        tbody.prepend(tr);-->
-<!--        while (tbody.rows.length > MAX_ROWS) tbody.deleteRow(-1);-->
-<!--        // optional toast-->
-<!--        window.smartToast && window.smartToast(`${(a.severity || 'info').toUpperCase()}: ${a.source} — ${a.message}`);-->
-<!--        scheduleSummaryRefresh();-->
-<!--      });-->
-
-<!--      es.onerror = () => {-->
-<!--        if (closed) return;-->
-<!--        try { es.close(); } catch {}-->
-<!--        setTimeout(connect, backoff);-->
-<!--        backoff = Math.min(backoff * 2, backMax);-->
-<!--      };-->
-<!--    } catch(e) {-->
-<!--      console.error('SSE connect error', e);-->
-<!--      setTimeout(connect, backoff);-->
-<!--    }-->
-<!--  }-->
-
-<!--  connect();-->
-<!--  window.addEventListener('beforeunload', () => { closed = true; if (es) es.close(); });-->
-<!--})();-->
-<!--</script>-->
 
 {% endblock %}
 
