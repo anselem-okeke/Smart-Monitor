@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="13852bf5-efb7-4174-a74c-642c81305c61" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker/healthcheck.gui.py" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/healthcheck.gui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/healthcheck.py" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/healthcheck.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
