@@ -1,6 +1,13 @@
 """
 main_cluster_recovery.py
 
+env:
+    export DATABASE_URL=postgresql://smart:smartpass@localhost:5432/smartdb
+    export K8S_CLUSTER_NAME=kind-smart-monitor
+    export K8S_CONTEXT=kind-smart-monitor
+    export K8S_POD_RECOVERY_LOOKBACK_MIN=5
+    export K8S_POD_RECOVERY_INTERVAL=60
+
 Orchestrates cluster-level health alerts:
 
   - reads recent *unhealthy* k8s_cluster_health rows

@@ -2,6 +2,7 @@
 
 ![Smart-Monitor Lab – Architecture](docs/overview/smart-monitor.svg)
 ![Smart-Monitor - Flowchart](docs/overview/SmartMonitor.svg)
+![Smart-Monitor - Kubernetes](docs/overview/smartmon-kubernetes.svg)
 
 ### Motivation for Developing Smart-Monitor
 
