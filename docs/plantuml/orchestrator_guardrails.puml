@@ -1,0 +1,34 @@
+@startuml smart_monitor_state_with_guardrail
+
+start
+
+:Orchestrator Collect metrics/health checks;
+
+if (CPU/mem/smart disk\nservice/nodes/pods) then (Health-Check-Failed)
+    #OrangeRed:state = FAILED;
+    #LightCyan:Remediation action,restart,\n      kill,cleanup,dry-run;
+    while (Guardrails; dry-run,cooldown,\nmax retries, critical services) is (yes)
+       #LightBlue:Execute remediation action;
+          if (Remediation successful?) then (yes)
+            #PaleGreen:state = HEALTHY;
+        else (no)
+            :Increase failure counter;
+            if (Max retries exceeded?) then (yes)
+                :Escalate to on-call\nand log critical incident;
+                stop
+            else (no)
+                :Wait cooldown period\nand re-evaluate;
+            endif
+        endif
+    endwhile
+
+  else (Health-Check-Pass)
+    #PaleGreen:state = HEALTHY;
+endif
+
+
+:Persist state + metrics\n     (in Postgres DB);
+
+stop
+
+@enduml

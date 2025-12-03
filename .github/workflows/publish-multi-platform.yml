@@ -30,7 +30,7 @@ on:
         default: true
 
   push:
-    branches: [dev]
+    branches: [main]
     paths:
       - 'platform_infra/docker/orchestrator.linux.Dockerfile'
       - 'platform_infra/docker/orchestrator.windows.Dockerfile'

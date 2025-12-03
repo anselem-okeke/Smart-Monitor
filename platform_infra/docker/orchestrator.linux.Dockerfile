@@ -67,7 +67,7 @@ RUN chmod +x /usr/local/bin/systemctl-shim
 FROM base AS linux
 ARG OS=linux
 RUN echo "[BUILD] Linux Orchestrator" && \
-    apt-get update && apt-get install -y systemd dbus util-linux smartmontools --no-install-recommends \
+    apt-get update && apt-get install -y systemd dnsutils traceroute iproute2 ethtool sysstat iputils-ping dbus util-linux smartmontools --no-install-recommends \
         ca-certificates curl tzdata procps && \
     rm -rf /var/lib/apt/lists/*
 

@@ -20,6 +20,13 @@ if PROJECT_ROOT not in sys.path:
 from db.db_logger import log_service_status_batch
 
 # ---------- helpers ----------
+import os
+
+def normalize_unit_name(unit: str) -> str:
+    u = (unit or "").strip()
+    # turn "/etc/systemd/system/foo.service" into "foo.service"
+    return os.path.basename(u) if "/" in u else u
+
 
 def _map_active_to_normalized(active_state: str) -> str:
     s = (active_state or "").strip().lower()
@@ -89,6 +96,8 @@ def _linux_list_units_cmd():
 
 def _linux_show_via_systemctl(unit: str):
     """Details via systemctl show."""
+    unit = normalize_unit_name(unit)
+
     res = subprocess.run(
         ["systemctl", "show", unit, "--property=ActiveState,SubState,Type,UnitFileState"],
         capture_output=True, text=True, timeout=6
@@ -110,6 +119,7 @@ def _linux_show_via_systemctl(unit: str):
 def _linux_show_via_cmd(unit: str):
     """Details via external shim that talks to systemd over D-Bus."""
     cmd = os.getenv("SERVICE_STATUS_CMD", "/usr/local/bin/systemctl-shim")
+    unit = normalize_unit_name(unit)
 
     # quick active state
     try:
@@ -176,6 +186,8 @@ def collect_linux_services():
     units = watch_list if watch_list else (
         _linux_list_units_cmd() if mode == "cmd" else _linux_list_units_systemctl()
     )
+    units = [normalize_unit_name(u) for u in units if u and u.strip()]
+    units = sorted(set(units))
 
     for svc_name in units:
         try:

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="360">
+  <style>
+    .box { fill:#f5f5f5; stroke:#333; stroke-width:1.5; rx:8; ry:8; }
+    .title { font-family:Arial, sans-serif; font-size:18px; font-weight:bold; }
+    .label { font-family:Arial, sans-serif; font-size:13px; font-weight:bold; }
+    .small { font-family:Arial, sans-serif; font-size:11px; }
+    .arrow { stroke:#333; stroke-width:1.5; marker-end:url(#arrow); fill:none; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+
+  <text x="20" y="30" class="title">Smart-Monitor Multi-Cluster Lab (Single VM)</text>
+
+  <!-- VM -->
+  <rect x="30" y="50" width="740" height="280" class="box" />
+  <text x="40" y="70" class="label">VM (Linux host)</text>
+
+  <!-- Kind clusters group -->
+  <rect x="60" y="100" width="260" height="200" class="box" />
+  <text x="70" y="120" class="label">Kind clusters</text>
+  <text x="70" y="140" class="small">Multiple Kubernetes clusters</text>
+  <text x="70" y="158" class="small">Running workloads &amp; services</text>
+  <text x="70" y="190" class="small">Example:</text>
+  <text x="80" y="208" class="small">- kind-cluster-1</text>
+  <text x="80" y="226" class="small">- kind-cluster-2</text>
+
+  <!-- Orchestrator -->
+  <rect x="360" y="120" width="180" height="80" class="box" />
+  <text x="370" y="140" class="label">Orchestrator</text>
+  <text x="370" y="160" class="small">Reads cluster + host state</text>
+  <text x="370" y="178" class="small">Runs detection &amp; remediation</text>
+
+  <!-- Postgres -->
+  <rect x="580" y="120" width="170" height="80" class="box" />
+  <text x="590" y="140" class="label">Postgres</text>
+  <text x="590" y="160" class="small">Shared telemetry DB</text>
+
+  <!-- Arrows -->
+  <line x1="320" y1="180" x2="360" y2="160" class="arrow" />
+  <line x1="540" y1="160" x2="580" y2="160" class="arrow" />
+
+  <!-- Caption -->
+  <text x="40" y="330" class="small">
+Single VM hosts multiple Kind clusters, the Smart-Monitor orchestrator, and a shared Postgres database for all metrics and events.
+  </text>
+</svg>
