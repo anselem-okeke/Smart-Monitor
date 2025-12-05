@@ -155,6 +155,7 @@ services:
     user: "0:0"
     environment:
       <<: [*env_common, *env_db]
+      SMARTMON_APPROVED_JSON: /app/config/approved_services.json
       SMARTMON_INIT_PG: ${SMARTMON_INIT_PG:-0}
       SMARTMON_API_KEY: ${SMARTMON_API_KEY:?set in .env}
       PROCFS_ROOT: /host/proc
@@ -163,6 +164,8 @@ services:
       SERVICE_STATUS_MODE: cmd
       SERVICE_STATUS_CMD: /usr/local/bin/systemctl-shim
       SMARTCTL: /usr/sbin/smartctl
+      SYSTEMCTL_CMD: /usr/bin/systemctl
+      SYSTEMCTL_ARGS: "--system"
       SMARTCTL_USE_SUDO: "0"
       SYSTEMCTL_FORCE_BUS: "1"
       SERVICE_STATUS_DEBUG: "1"
@@ -179,6 +182,7 @@ services:
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
       - /dev:/dev                            # SMART device access
       - /etc/machine-id:/etc/machine-id:ro
+      - /run/systemd/private:/run/systemd/private
       - ${APPROVED_JSON_HOST}:/app/config/approved_services.json:ro
       - ${CLUSTER_CONFIG}:/app/config/kube/config:ro
       #- /vagrant/Smart-Monitor/platform_infra/docker_compose/systemctl-shim:/usr/local/bin/systemctl-shim:ro

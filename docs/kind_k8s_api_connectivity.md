@@ -2,7 +2,8 @@
 
 **Purpose**
 
-When Smart-Monitor Orchestrator runs in Docker Compose and must monitor a Kind cluster, it may report K8s API down even though the cluster is up. This runbook fixes the connection by ensuring:
+When Smart-Monitor Orchestrator runs in Docker Compose and must monitor a Kubernetes cluster, it may report K8s API
+down even though the cluster is up. This runbook fixes the connection by ensuring:
 
  - The container loads the correct kubeconfig
 
@@ -208,3 +209,201 @@ Inside a Pod, Kubernetes automatically provides:
 - Namespace at: `/var/run/secrets/kubernetes.io/serviceaccount/namespace`
 - The Python client’s `config.load_incluster_config()` reads those and makes HTTPS calls to: `https://kubernetes.default.svc` 
 (the API service in-cluster)
+
+---
+
+### REVISED
+1) Find what host port kind exposes for the API (6443/tcp)
+```shell
+docker port smart-monitor-control-plane 6443/tcp
+```
+**expected**
+
+0.0.0.0:6443 ✅ (stable, ideal), OR
+
+127.0.0.1:38071 (random host port)
+
+Capture the port:
+```shell
+apip=$(docker port smart-monitor-control-plane 6443/tcp | awk -F: '{print $2}')
+echo "$apip"
+```
+2) Check certificate SANs for what you want to connect to
+```shell
+echo | openssl s_client -connect 127.0.0.1:$apip -servername 127.0.0.1 2>/dev/null \
+  | openssl x509 -noout -text | sed -n '/Subject Alternative Name/,+2p'
+```
+looking for:
+
+DNS:host.docker.internal, or
+
+at least IP Address:127.0.0.1 / IP Address:172.17.0.1 etc.
+
+If host.docker.internal is not in SANs, then connecting to it will often fail TLS verification.
+
+3) Update the container kubeconfig to use host endpoint
+
+Important: keep the same port $apip (don’t force 6443 unless that’s actually the host port).
+```shell
+cp /home/vagrant/.kube/config /home/vagrant/.kube/config.docker
+
+# safer than sed: update by cluster name
+KUBECONFIG=/home/vagrant/.kube/config.docker \
+kubectl config set-cluster kind-smart-monitor --server="https://host.docker.internal:$apip"
+```
+verify:
+```shell
+grep -n "server:" /home/vagrant/.kube/config.docker | head -n 30
+```
+4) Ensure compose mounts this kubeconfig and uses it
+
+You already have:
+
+extra_hosts: host.docker.internal:host-gateway
+
+volume mount to /app/config/kube/config
+
+KUBECONFIG=/app/config/kube/config
+
+Recreate:
+```shell
+docker compose up -d --force-recreate orchestrator_lab
+```
+5) Hard verification in container (real test)
+```shell
+docker exec -it sm-orchestrator-lab sh -lc '
+python3 - <<PY
+from kubernetes import config, client
+config.load_kube_config(config_file="/app/config/kube/config", context="kind-smart-monitor")
+print("OK version:", client.VersionApi().get_code().git_version)
+PY
+'
+```
+
+**works even without SAN changes): Use control-plane container IP + attach networks**
+
+Get control-plane container IP
+```shell
+docker inspect smart-monitor-control-plane --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+```
+Example: 172.18.0.2
+
+Put that IP into the docker kubeconfig
+```shell
+cp /home/vagrant/.kube/config /home/vagrant/.kube/config.docker
+KUBECONFIG=/home/vagrant/.kube/config.docker \
+kubectl config set-cluster kind-smart-monitor --server="https://172.18.0.2:6443"
+```
+verify:
+```shell
+grep -n "server:" /home/vagrant/.kube/config.docker | head -n 30
+```
+
+Ensure orchestrator can route to that IP (critical)
+
+Find the kind network name:
+```shell
+docker inspect smart-monitor-control-plane \
+  --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}'
+```
+
+Attach orchestrator to that network (use the printed network name, commonly kind):
+```shell
+docker network connect kind sm-orchestrator-lab
+```
+Validate from inside container
+```shell
+docker exec -it sm-orchestrator-lab sh -lc '
+curl -sk https://172.18.0.4:6443/healthz && echo
+'
+```
+
+## Make Kind API port stable on the host (no random port)
+
+```yaml
+# Updated kind-config.yaml with explicit node definitions
+#kind delete cluster --name smart-monitor
+#kind create cluster --name smart-monitor --config kind-config.yaml
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  apiServerAddress: "0.0.0.0"
+  apiServerPort: 6443
+kubeadmConfigPatches:
+- |
+  kind: ClusterConfiguration
+  apiServer:
+    certSANs:
+      - "host.docker.internal"
+      - "172.17.0.1"
+      - "127.0.0.1"
+# --- section to define nodes ---
+nodes:
+- role: control-plane
+  extraPortMappings:
+    - containerPort: 30001
+      hostPort: 30001
+- role: worker
+- role: worker
+```
+
+Then recreate:
+```shell
+kind delete cluster --name smart-monitor
+kind create cluster --name smart-monitor --config kind-config.yaml
+```
+
+Why this matters
+
+- apiServerPort: 6443 removes the “random hostport” problem.
+
+- certSANs makes the API certificate valid when clients connect using those names/IPs.
+
+**Ensure containers can resolve host.docker.internal (Linux needs this)**
+
+In docker-compose.yml for the orchestrator service add:
+```yaml
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
+
+Why this matters
+
+- On Linux, host.docker.internal is not guaranteed unless you map it.
+
+- host-gateway resolves to the host’s gateway IP from the container’s POV (commonly `172.17.0.1`).
+
+**Use a dedicated kubeconfig for containers (server points to host.docker.internal)**
+
+Create a container kubeconfig:
+```shell
+cp ~/.kube/config ~/.kube/config.docker
+kubectl --kubeconfig ~/.kube/config.docker config set-cluster kind-smart-monitor \
+  --server=https://host.docker.internal:6443
+```
+Host config:
+```shell
+kubectl --kubeconfig ~/.kube/config.docker config set-cluster kind-smart-monitor \
+  --server=https://127.0.0.1:6443
+```
+Mount it into orchestrator and hard-set KUBECONFIG:
+```yaml
+volumes:
+  - ~/.kube/config.docker:/app/config/kube/config:ro
+environment:
+  KUBECONFIG: /app/config/kube/config
+```
+Why hard-set matters
+- It prevents the “wrong path → kubeconfig missing → in-cluster fallback → Service host/port is not set” chain.
+
+**Validate from inside orchestrator (real test)**
+````shell
+docker exec -it sm-orchestrator-lab sh -lc '
+python3 - <<PY
+from kubernetes import config, client
+config.load_kube_config(config_file="/app/config/kube/config", context="kind-smart-monitor")
+print("OK version:", client.VersionApi().get_code().git_version)
+PY
+'
+````

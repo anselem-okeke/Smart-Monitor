@@ -5,19 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="13852bf5-efb7-4174-a74c-642c81305c61" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.github/workflows/publish-multi-platform.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/publish-multi-platform.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/overview/SmartMonitor_Lab_Sequence.puml" beforeDir="false" afterPath="$PROJECT_DIR$/docs/plantuml/SmartMonitor_Lab_Sequence.puml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/overview/seq_memory_pressure_kill.puml" beforeDir="false" afterPath="$PROJECT_DIR$/docs/plantuml/seq_memory_pressure_kill.puml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/overview/seq_network_remediation.puml" beforeDir="false" afterPath="$PROJECT_DIR$/docs/plantuml/seq_network_remediation.puml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/overview/seq_restart.puml" beforeDir="false" afterPath="$PROJECT_DIR$/docs/plantuml/seq_restart.puml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker/orchestrator.linux.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker/orchestrator.linux.Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/smartmon_compose.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/k8s/recovery/crashloop-demo.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/k8s/k8s_kind/crashloop-demo.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/k8s/recovery/imagepullbackoff.yml" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/k8s/k8s_kind/imagepullbackoff.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/k8s/recovery/longpending.yml" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/k8s/k8s_kind/longpending.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/kind_k8s_api_connectivity.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/kind_k8s_api_connectivity.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/logs/network_recovery.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/network_recovery.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker/docker-compose.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
