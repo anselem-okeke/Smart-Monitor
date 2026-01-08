@@ -2,134 +2,6 @@
 """Author: Anselem Okeke"""
 #------------------------------------------
 
-# import os
-# import sys
-# # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
-#
-# import platform
-# import subprocess
-# import time
-# import traceback
-# from datetime import datetime
-# import json
-# from scripts.db_logger import log_alert, log_recovery
-# from db.db_access import db_access_for_service_recovery, count_recent_restart_attempts
-#
-#
-# CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../config/db_config.json"))
-# with open(CONFIG_PATH, "r") as f:
-#     config = json.load(f)
-#
-# DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../" + config["path"]))
-# MAX_RESTART_ATTEMPTS = 3
-# RESTART_INTERVAL_MINUTES = 10
-# BACKOFF_BASE_WAIT_SECONDS = 60
-#
-#
-# # def restart_service_windows(service_name):
-# #     try:
-# #         result = subprocess.run(["sc", "start", service_name], capture_output=True, text=True)
-# #         if result.returncode == 0:
-# #             return True, result.stdout
-# #         return False, result.stderr
-# #     except Exception as e:
-# #         return False, str(e)
-#
-# def restart_service_windows(service_name):
-#     try:
-#         # Attempt to start the service
-#         subprocess.run(["sc", "start", service_name], capture_output=True, text=True)
-#
-#         # Check the service status
-#         result = subprocess.run(["sc", "query", service_name], capture_output=True, text=True)
-#
-#         if result.returncode != 0:
-#             return False, result.stderr
-#
-#         output = result.stdout
-#         for line in output.splitlines():
-#             if "STATE" in line:
-#                 if "RUNNING" in line:
-#                     return True, output
-#                 else:
-#                     return False, output
-#         return False, output  # Couldn't find STATE line
-#
-#     except Exception as e:
-#         return False, str(e)
-#
-#
-# def restart_service_linux(service_name):
-#     try:
-#         result = subprocess.run(["sudo", "systemctl", "restart", service_name], capture_output=True, text=True)
-#         if result.returncode == 0:
-#             return True, result.stdout
-#         return False, result.stderr
-#     except Exception as e:
-#         return False, str(e)
-#
-# def attempt_service_recovery():
-#     platform_name = platform.system()
-#
-#     for service_name, status, hostname in db_access_for_service_recovery():
-#         if status in ("stopped", "failed"):
-#             """Checking how many restart attempts were made in the past 10mins"""
-#             recent_attempts = count_recent_restart_attempts(service_name, minutes=RESTART_INTERVAL_MINUTES)
-#
-#             if recent_attempts >= MAX_RESTART_ATTEMPTS:
-#                 print(f"[WARN] Too many restart attempts for {service_name}, skipping...")
-#                 continue
-#
-#             # exponential backoff wait
-#             if recent_attempts > 0:
-#                 wait_time = BACKOFF_BASE_WAIT_SECONDS * (2 ** (recent_attempts - 1))
-#                 print(f"[INFO] Waiting {wait_time} seconds before retrying {service_name}")
-#                 time.sleep(wait_time)
-#
-#             print(f"[INFO] Attempting to restart {service_name} on {hostname}")
-#
-#             if platform_name == "Windows":
-#                 success, msg = restart_service_windows(service_name)
-#             else:
-#                 success, msg = restart_service_linux(service_name)
-#
-#             result = "success" if success else "fail"
-#
-#             log_recovery([{
-#                 "timestamp":  datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
-#                 "hostname": hostname,
-#                 "os_platform": platform_name,
-#                 "service_name": service_name,
-#                 "result": result,
-#                 "error_message": msg
-#             }])
-#
-#             if success:
-#                 print(f"[INFO] Successfully restarted {service_name}: {msg}")
-#             else:
-#                 print(f"[ERROR] Failed to restart {service_name}: {msg}")
-#                 log_alert({
-#                     "hostname": hostname,
-#                     "severity": "warning",
-#                     "source": "Service Recovery",
-#                     "message":f"Failed recover {service_name}: {msg}"
-#                 })
-# if __name__ == '__main__':
-#     print("[INFO] Starting Service Recovery...")
-#     try:
-#         while True:
-#             try:
-#                 attempt_service_recovery()
-#                 print("[INFO] Processed Service Recovery successfully")
-#             except Exception as e:
-#                 print(f"[ERROR] Exception in attempt_service_recovery: {e}")
-#                 traceback.print_exc()
-#
-#             print("[INFO] Waiting 60 seconds before next recovery attempt...")
-#             time.sleep(60)
-#
-#     except KeyboardInterrupt:
-#         print("[INFO] Service Recovery stopped by user.")
 import argparse
 import os, sys
 import shutil
@@ -240,67 +112,122 @@ def restart_service_windows(service_name: str, timeout_s: int = 25):
 #         return False, str(e)
 
 
-def restart_service_linux(service_name: str, timeout_s: int = 20):
-    WRAPPER = "/usr/local/bin/smartmon-restart-service"
-    unit = service_name if service_name.endswith(".service") else f"{service_name}.service"
 
-    # If we're root, don't use sudo or the wrapper—just call systemctl directly.
-    if os.geteuid() == 0:
-        cmd = ["/bin/systemctl", "restart", unit]
-        check = ["/bin/systemctl", "is-active", "--quiet", unit]
-    else:
-        if shutil.which(WRAPPER):
-            cmd = ["sudo", "-n", WRAPPER, unit]
-            check = ["sudo", "-n", "/bin/systemctl", "is-active", "--quiet", unit]
-        else:
-            # Fallback: try sudo systemctl directly (requires sudoers permission)
-            cmd = ["sudo", "-n", "/bin/systemctl", "restart", unit]
-            check = ["sudo", "-n", "/bin/systemctl", "is-active", "--quiet", unit]
+def _unit(name: str) -> str:
+    return name if name.endswith(".service") else f"{name}.service"
+
+def _busctl_restart_unit(unit: str, timeout_s: int):
+    busctl = shutil.which("busctl") or "/usr/bin/busctl"
+
+    # Try RestartUnit
+    cmd = [
+        busctl, "--system", "call",
+        "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
+        "org.freedesktop.systemd1.Manager", "RestartUnit",
+        "ss", unit, "replace"
+    ]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
+    if r.returncode == 0:
+        return True, (r.stdout or "restart requested").strip()
+
+    # Fallback: StopUnit + StartUnit
+    err = (r.stderr or r.stdout or "").strip()
+
+    stop_cmd = [
+        busctl, "--system", "call",
+        "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
+        "org.freedesktop.systemd1.Manager", "StopUnit",
+        "ss", unit, "replace"
+    ]
+    start_cmd = [
+        busctl, "--system", "call",
+        "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
+        "org.freedesktop.systemd1.Manager", "StartUnit",
+        "ss", unit, "replace"
+    ]
 
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
-        if r.returncode != 0:
-            msg = (r.stderr or r.stdout or "restart failed").strip()
-            if "a password is required" in msg.lower():
-                msg = "sudo needs a password (add NOPASSWD or run orchestrator as root)."
-            if "command not found" in msg.lower() and WRAPPER in " ".join(cmd):
-                msg = f"wrapper missing on host: {WRAPPER}"
-            return False, msg
+        subprocess.run(stop_cmd, capture_output=True, text=True, timeout=timeout_s)
+        r2 = subprocess.run(start_cmd, capture_output=True, text=True, timeout=timeout_s)
+        if r2.returncode == 0:
+            return True, "stop+start requested (RestartUnit failed)"
+        err2 = (r2.stderr or r2.stdout or "").strip()
+        return False, f"RestartUnit failed: {err}; StartUnit failed: {err2}"
+    except Exception as e:
+        return False, f"RestartUnit failed: {err}; fallback stop/start error: {e}"
 
-        # verify it came back up
-        rc = subprocess.run(check, capture_output=True, text=True, timeout=5).returncode
-        return (rc == 0), ("restart requested" if rc == 0 else "service not active after restart")
+def restart_service_linux(service_name: str, timeout_s: int = 20):
+    unit = _unit(service_name)
+
+    force_bus = os.getenv("SYSTEMCTL_FORCE_BUS", "0") == "1"
+    in_container = os.path.exists("/.dockerenv") or os.getenv("container") is not None
+
+    try:
+        # Prefer host systemd via D-Bus in containers / when forced
+        if force_bus or in_container:
+            ok, msg = _busctl_restart_unit(unit, timeout_s=timeout_s)
+        else:
+            cmd = ["/bin/systemctl", "restart", unit]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
+            if r.returncode != 0:
+                return False, (r.stderr or r.stdout or "restart failed").strip()
+            ok, msg = True, "restart requested via systemctl"
+
+        # Verify using the same source you use for monitoring (shim)
+        shim = os.getenv("SERVICE_STATUS_CMD", "/usr/local/bin/systemctl-shim")
+        if os.path.exists(shim):
+            deadline = time.time() + 15
+            while time.time() < deadline:
+                q = subprocess.run([shim, "is-active", unit], capture_output=True, text=True, timeout=5)
+                state = (q.stdout or "").strip().lower()
+                if state == "active":
+                    return True, msg
+                if state == "failed":
+                    return False, "service entered failed state after restart"
+                time.sleep(1)
+            return False, "service not active after restart (timeout)"
+        return ok, msg
+
     except subprocess.TimeoutExpired:
         return False, "restart timed out"
     except Exception as e:
         return False, str(e)
-#
-# def restart_service_linux(service_name: str, timeout_s: int = 20):
-#     try:
-#         # DO NOT call "systemctl reset-failed" here
-#         r = subprocess.run(
-#             ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
-#             capture_output=True, text=True, timeout=10
-#         )
-#         if r.returncode != 0:
-#             return False, r.stderr.strip() or "Restart failed"
-#         # (poll is-active for up to timeout_s if you want)
-#         return True, "restart requested"
-#     except subprocess.TimeoutExpired:
-#         return False, "systemctl timed out"
-#     except Exception as e:
-#         return False, str(e)
 
-# def restart_service_linux(service_name: str):
-#     """Restart a systemd service on Linux via safe wrapper (no password prompts)."""
+
+
+
+# def restart_service_linux(service_name: str, timeout_s: int = 20):
+#     WRAPPER = "/usr/local/bin/smartmon-restart-service"
+#     unit = service_name if service_name.endswith(".service") else f"{service_name}.service"
+#
+#     # If we're root, don't use sudo or the wrapper—just call systemctl directly.
+#     if os.geteuid() == 0:
+#         cmd = ["/bin/systemctl", "restart", unit]
+#         check = ["/bin/systemctl", "is-active", "--quiet", unit]
+#     else:
+#         if shutil.which(WRAPPER):
+#             cmd = ["sudo", "-n", WRAPPER, unit]
+#             check = ["sudo", "-n", "/bin/systemctl", "is-active", "--quiet", unit]
+#         else:
+#             # Fallback: try sudo systemctl directly (requires sudoers permission)
+#             cmd = ["sudo", "-n", "/bin/systemctl", "restart", unit]
+#             check = ["sudo", "-n", "/bin/systemctl", "is-active", "--quiet", unit]
+#
 #     try:
-#         result = subprocess.run(
-#             ["sudo", "-n", "/usr/local/bin/smartmon-restart-service", service_name],
-#             capture_output=True, text=True
-#         )
-#         if result.returncode == 0:
-#             return True, result.stdout.strip() or f"{service_name} restarted successfully"
-#         return False, result.stderr.strip() or f"Failed to restart {service_name}"
+#         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
+#         if r.returncode != 0:
+#             msg = (r.stderr or r.stdout or "restart failed").strip()
+#             if "a password is required" in msg.lower():
+#                 msg = "sudo needs a password (add NOPASSWD or run orchestrator as root)."
+#             if "command not found" in msg.lower() and WRAPPER in " ".join(cmd):
+#                 msg = f"wrapper missing on host: {WRAPPER}"
+#             return False, msg
+#
+#         # verify it came back up
+#         rc = subprocess.run(check, capture_output=True, text=True, timeout=5).returncode
+#         return (rc == 0), ("restart requested" if rc == 0 else "service not active after restart")
+#     except subprocess.TimeoutExpired:
+#         return False, "restart timed out"
 #     except Exception as e:
 #         return False, str(e)
 
@@ -341,12 +268,20 @@ def attempt_service_recovery():
         if status not in ("stopped", "failed"):
             continue  # skip healthy services
 
-        if service_name not in approved_services:
+        # allow explicit service OR wildcard
+        if "*" not in approved_services and service_name not in approved_services:
             log_unclassified_service(
                 (service_name, status, hostname, sub_state, service_type, unit_file_state, recoverable),
                 reason="Not in approved_services"
             )
             continue
+
+        # if service_name not in approved_services:
+        #     log_unclassified_service(
+        #         (service_name, status, hostname, sub_state, service_type, unit_file_state, recoverable),
+        #         reason="Not in approved_services"
+        #     )
+        #     continue
 
         if not recoverable:
             print(f"[SKIP] {service_name}: not recoverable")

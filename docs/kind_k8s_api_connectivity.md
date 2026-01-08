@@ -384,7 +384,7 @@ kubectl --kubeconfig ~/.kube/config.docker config set-cluster kind-smart-monitor
 ```
 Host config:
 ```shell
-kubectl --kubeconfig ~/.kube/config.docker config set-cluster kind-smart-monitor \
+kubectl --kubeconfig ~/.kube/config config set-cluster kind-smart-monitor \
   --server=https://127.0.0.1:6443
 ```
 Mount it into orchestrator and hard-set KUBECONFIG:

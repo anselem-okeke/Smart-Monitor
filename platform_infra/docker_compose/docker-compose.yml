@@ -79,6 +79,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2024.10.0
     container_name: sm-cloudflared
+    user: "65532:65532"
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
     environment:
@@ -143,6 +144,7 @@ services:
     image: ${ORCH_IMAGE}
     container_name: sm-orchestrator-lab
     extra_hosts:
+    - "kubernetes:host-gateway"
     - "host.docker.internal:host-gateway"
     entrypoint: [ "bash", "-lc", "unset SMARTMONITOR_DB_PATH; exec /app/entrypoint.sh" ]
     depends_on:
@@ -171,6 +173,8 @@ services:
       SERVICE_STATUS_DEBUG: "1"
       DBUS_SYSTEM_BUS_ADDRESS: "unix:path=/run/dbus/system_bus_socket"
       KUBECONFIG: /app/config/kube/config
+      REQUESTS_CA_BUNDLE: /app/config/kube/ca.crt
+      SSL_CERT_FILE: /app/config/kube/ca.crt
       K8S_CLUSTER_NAME: ${K8S_CLUSTER_NAME}
       K8S_CONTEXT: ${K8S_CONTEXT}
       K8S_POD_RECOVERY_LOOKBACK_MIN: ${K8S_POD_RECOVERY_LOOKBACK_MIN}
@@ -185,6 +189,7 @@ services:
       - /run/systemd/private:/run/systemd/private
       - ${APPROVED_JSON_HOST}:/app/config/approved_services.json:ro
       - ${CLUSTER_CONFIG}:/app/config/kube/config:ro
+      - ${CERT_FILE}:/app/config/kube/ca.crt:ro
       #- /vagrant/Smart-Monitor/platform_infra/docker_compose/systemctl-shim:/usr/local/bin/systemctl-shim:ro
     healthcheck:
       test: ["CMD", "python3", "/app/healthcheck.py"]

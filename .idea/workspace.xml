@@ -5,12 +5,32 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="13852bf5-efb7-4174-a74c-642c81305c61" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/devops-pipeline-slide1.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-architecture-v3.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-chaos.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-db-schema.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-full.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-metrics-pipeline.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-minimal.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-multicluster-layout.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-multicluster-simple.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-rca.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-remediation.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/diagrams/smart-monitor-state-engine.svg" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/docs/kind_k8s_api_connectivity.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/kind_k8s_api_connectivity.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.drawio" beforeDir="false" afterPath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.drawio" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.mp4" beforeDir="false" afterPath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.mp4" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.png" beforeDir="false" afterPath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.svg" beforeDir="false" afterPath="$PROJECT_DIR$/docs/overview/smartmon-kubernetes.svg" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/logs/network_recovery.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/network_recovery.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker/docker-compose.yml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" beforeDir="false" afterPath="$PROJECT_DIR$/platform_infra/docker_compose/systemctl-shim" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/monitor/network_tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/network_tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/monitor/service_monitor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/recovery/service/service_recovery.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/recovery/service/service_recovery.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/config_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/config_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

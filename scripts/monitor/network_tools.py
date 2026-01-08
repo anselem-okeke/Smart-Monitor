@@ -391,6 +391,13 @@ def run_network_checks():
                 "source": f"nslookup:{data['target']}",
                 "message": f"DNS failure: {data['result'][:60]}..."
             })
+        elif method == "traceroute" and data['status'] in ['fail', 'error']:
+            log_alert({
+                "hostname": data['hostname'],
+                "severity": "warning",  # traceroute is often noisy; keep warning
+                "source": f"traceroute:{data['target']}",
+                "message": f"Traceroute {data['status']} to {data['target']}: {str(data['result'])[:120]}..."
+            })
         print(f"[INFO] Logged {method} to {target}: {data['status']}")
 
 def handle_network_tools():
