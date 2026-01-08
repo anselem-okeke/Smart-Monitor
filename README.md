@@ -1,6 +1,6 @@
 ## Smart-Monitor  (In Production - live)
 
-![Smart-Dashboard](docs/overview/dashboard_rec.gif)
+![Smart-Dashboard](docs/overview/dashboard_rec%20(1).gif)
 ![Smart-Monitor Lab – Architecture](docs/overview/smart-monitor.svg)
 ![Smart-Monitor - Flowchart](docs/overview/SmartMonitor.svg)
 
